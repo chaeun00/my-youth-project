@@ -1,0 +1,51 @@
+# === 1. Data & Large Files (모델 파일 추가) ===
+data/
+*.pdf
+*.jpg
+*.png
+*.hwp
+*.csv
+*.xlsx
+# 모델 가중치는 절대 Git에 올리지 않습니다 (DVC 권장)
+*.pt
+*.pth
+*.bin
+*.h5
+*.onnx
+
+# === 2. MLOps Tools (MLflow, Airflow 추가) ===
+# MLflow 실험 결과 및 로컬 DB
+mlruns/
+mlflow.db
+
+# Airflow 설정 및 로그 (로컬 테스트 시 생성됨)
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/webserver_config.py
+airflow/unittests.cfg
+
+# === 3. Docker & Infrastructure (DB 볼륨 추가) ===
+# Docker Compose에서 연결한 DB 데이터 폴더 (매우 중요!)
+pgdata/
+mysql_data/
+.docker/
+
+# Kubernetes 관련 민감 설정 (Context 등)
+*.kubeconfig
+certs/
+
+# === 4. Secrets & Configs (환경 변수) ===
+.env
+.env.local
+configs/auth_key.json
+secrets/
+
+# === 5. Python & IDE (기존 내용) ===
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
