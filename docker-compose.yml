@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # 1. 데이터베이스 서비스 (PostgreSQL)
+  db:
+    image: postgres:15
+    container_name: youth_db_container
+    # 컨테이너가 어떤 이유로든 멈췄을 때 자동으로 다시 살려내는 역할
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    # 컨테이너 내부의 DB 저장소(/var/lib/postgresql/data)를
+    # pgdata라는 이름의 안전한 별도 저장소에 연결합니다.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # 2. 파이썬 웹 서버 서비스 (FastAPI)
+  app:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    container_name: youth_api_container
+    restart: always
+    # 윈도우 VS Code에서 코드를 수정하고 저장하는 순간 컨테이너 안의 코드도 즉시 바뀜.
+    volumes:
+      - .:/app
+    ports:
+      - "${API_PORT}:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+# 이 프로젝트 전체에서 pgdata라는 이름의 공용 저장소를 사용합니다.
+volumes:
+  pgdata:
