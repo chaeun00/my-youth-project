@@ -4,6 +4,10 @@ uvicorn[standard]==0.24.0   # 고성능 웹 서버
 python-multipart==0.0.6     # 파일 업로드 처리용
 pydantic[email]==2.5.2      # 데이터 검증 및 설정 관리
 
+# --- Scraping ---
+beautifulsoup4==4.12.2
+requests==2.31.0
+
 # --- Database & Vector Search (PostgreSQL) ---
 sqlalchemy==2.0.23          # ORM (파이썬 코드로 DB 조작)
 psycopg2-binary==2.9.9      # PostgreSQL 드라이버
