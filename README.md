@@ -64,6 +64,7 @@ my-youth-project/
 ├── ml_engineering/         # [Layer 2] 모델 학습 및 추론
 │   ├── train/              # 모델 학습 및 Fine-tuning 로직
 │   └── eval/               # 성능 평가 및 XAI 시각화
+│   └── inference/          # 모델에 실제 데이터를 넣고 결과물을 뽑아내는 로직
 ├── api_service/            # [Layer 3] FastAPI 기반 백엔드 및 챗봇 로직
 ├── notebooks/              # 데이터 분석(EDA) 및 프로토타입 실험 (Jupyter)
 ├── deploy/                 # [Layer 4] 배포 및 인프라 설정
