@@ -69,6 +69,7 @@ my-youth-project/
 ├── notebooks/              # 데이터 분석(EDA) 및 프로토타입 실험 (Jupyter)
 ├── deploy/                 # [Layer 4] 배포 및 인프라 설정
 │   ├── docker/             # Dockerfile 모음
+│   ├── postgres/           # PostgreSQL 인프라 설정 및 DB 초기화(init.sql) 정의
 │   ├── k8s/                # Kubernetes Manifests (Deployment, Service, Ingress)
 │   ├── airflow/            # 데이터 파이프라인 DAGs
 │   └── mlflow/             # 실험 관리 설정

@@ -1,8 +1,8 @@
 services:
   # 1. 데이터베이스 서비스 (PostgreSQL)
   db:
-    image: postgres:15
-    container_name: youth_db_container
+    image: postgres:15-alpine
+    container_name: scraper_postgres
     # 컨테이너가 어떤 이유로든 멈췄을 때 자동으로 다시 살려내는 역할
     restart: always
     environment:
@@ -12,18 +12,39 @@ services:
     ports:
       - "${DB_PORT}:5432"
     # 컨테이너 내부의 DB 저장소(/var/lib/postgresql/data)를
-    # pgdata라는 이름의 안전한 별도 저장소에 연결합니다.
+    # postgres_data라는 이름의 안전한 별도 저장소에 연결합니다.
     volumes:
+      # 실제 데이터 저장 (선언한 pgdata 볼륨을 사용합니다.)
       - pgdata:/var/lib/postgresql/data
+      # DB 초기화 스크립트 연결 (상대 경로 주의)
+      - ./deploy/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # [Healthcheck] DB가 단순히 켜진 것을 넘어, 실제로 쿼리를 받을 준비가 되었는지 검사
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s # 10초마다 상태 확인
+      timeout: 5s   # 5초 이내에 응답이 없으면 실패로 간주
+      retries: 5    # 5번 연속 실패 시 해당 컨테이너를 '비정상'으로 간주
 
-  # 2. 파이썬 웹 서버 서비스 (FastAPI)
-  app:
+  # 2. DB 내부 데이터를 눈으로 확인하기 위한 GUI 관리 도구
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: scraper_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com # pgAdmin 웹 화면 로그인 아이디
+      PGADMIN_DEFAULT_PASSWORD: admin        # pgAdmin 웹 화면 로그인 비밀번호
+    ports:
+      - "8080:80" # 웹 브라우저에서 http://localhost:8080 으로 접속 가능하게 설정
+    depends_on:
+      - db # db 서비스가 먼저 실행된 후에 pgadmin을 실행하도록 순서 강제
+
+  # 3. API 서비스 (기존 FastAPI)
+  api:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile
     container_name: youth_api_container
     restart: always
-    # 윈도우 VS Code에서 코드를 수정하고 저장하는 순간 컨테이너 안의 코드도 즉시 바뀜.
     volumes:
       - .:/app
     ports:
@@ -31,8 +52,24 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy # DB가 '진짜' 준비될 때까지 대기
 
-# 이 프로젝트 전체에서 pgdata라는 이름의 공용 저장소를 사용합니다.
+  # 4. 스크래퍼 전용 서비스 (테이스용)
+  scraper:
+    image: python:3.10-slim
+    container_name: scraper_app
+    volumes:
+      - .:/app
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app/data_engineering
+    command: tail -f /dev/null
+    depends_on:
+      db:
+        condition: service_healthy
+# 프로젝트 전체에서 사용하는 볼륨 정의
 volumes:
-  pgdata:
+  pgdata: # 이제 이 녀석이 db 서비스에서 실사용됩니다!
