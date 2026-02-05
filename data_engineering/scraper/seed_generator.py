@@ -1,20 +1,47 @@
 import os
 import requests
 import xml.etree.ElementTree as ET
+import json
+import time
 from dotenv import load_dotenv
 from urllib.parse import unquote # 키 값을 안전하게 처리하기 위해 필요합니다.
 
 load_dotenv()  # .env 파일에 숨겨둔 API 키를 가져옵니다.
 
-def fetch_all_gov_data():
+# 저장 경로 설정
+BASE_DIR = "data_engineering/scraper"
+CHECKPOINT_FILE = os.path.join(BASE_DIR, "head_orgs_checkpoint.json")
+OUTPUT_FILE = os.path.join(BASE_DIR, "head_orgs_final.json")
+
+def save_checkpoint(data, last_page):
+    """중간 수집 결과를 저장합니다."""
+    checkpoint = {"last_page": last_page, "data": data}
+    with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+        json.dump(checkpoint, f, ensure_ascii=False, indent=2)
+
+def load_checkpoint():
+    """이전에 저장된 기록이 있다면 불러옵니다."""
+    if os.path.exists(CHECKPOINT_FILE):
+        try:
+            with open(CHECKPOINT_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except: pass
+    return {"last_page": 0, "data": []}
+
+def fetch_head_gov_data():
     # .env에서 키를 가져온 뒤, 혹시 모르니 unquote로 디코딩 상태를 보장합니다.
     raw_key = os.getenv("GOV_API_KEY")
     service_key = unquote(raw_key)
     url = "https://apis.data.go.kr/1741000/StanOrgCd2/getStanOrgCdList2" # 호출할 API 주소예요.
     
-    all_rows = []    # 수집한 모든 기관 데이터(<row>)를 담을 바구니(리스트)입니다.
-    page_no = 1      # 처음 시작할 페이지 번호입니다.
-    num_of_rows = 500  # 한 번 요청할 때 가져올 데이터 개수예요.
+    # 중간 지점부터 시작
+    checkpoint = load_checkpoint()
+    head_orgs = checkpoint["data"]    # 수집한 모든 기관 데이터(<row>)를 담을 바구니(리스트)입니다.
+    start_page = checkpoint["last_page"] + 1
+    
+    page_no = start_page    # 시작할 페이지 번호입니다.
+    num_of_rows = 500       # 한 번 요청할 때 가져올 데이터 개수예요.
+    total_raw_count = (page_no - 1) * num_of_rows  # 지금까지 처리한 전체 기관 수입니다.
     
     while True:      # 모든 데이터를 다 가져올 때까지 무한 반복합니다.
         # URL 뒤에 쿼리 스트링을 직접 붙여서 보냅니다.
@@ -28,59 +55,68 @@ def fetch_all_gov_data():
         )
         full_url = f"{url}?{query_params}"
         
-        print(f"📡 {page_no}페이지 수집 중... (URL 직접 호출)")
-        response = requests.get(full_url, timeout=30) # 타임아웃을 넉넉히 줍니다.
+        # --- [차단 방지 1] 재시도 로직 (Retry Logic) ---
+        retry_count = 0
+        max_retries = 5
+        response = None
         
-        if response.status_code != 200:
-            print(f"❌ 서버 에러 발생 (Status: {response.status_code})")
-            print(f"📄 에러 내용: {response.text}")
-            break # 혹은 return []
-            
+        while retry_count < max_retries:
+            try:
+                print(f"📡 {page_no}페이지 호출 중... (시도 {retry_count + 1}/{max_retries})")
+                response = requests.get(full_url, timeout=30)
+                response.raise_for_status()
+                break # 성공 시 루프 탈출
+            except Exception as e:
+                retry_count += 1
+                wait_time = retry_count * 60 # 에러 시 1분, 2분... 점진적으로 대기 시간 증가
+                print(f"⚠️ 에러 발생 ({e}). {wait_time}초 후 재시도합니다.")
+                time.sleep(wait_time)
+        
+        if not response or response.status_code != 200:
+            print("❌ 복구 불가능한 에러로 인해 수집을 중단합니다.")
+            break
+        
+        # --- 데이터 처리 ---
         try:
             root = ET.fromstring(response.content)
-        except ET.ParseError as e:
-            print(f"❌ XML 파싱 실패: 데이터가 XML 형식이 아닙니다.")
-            print(f"📄 받은 데이터 샘플: {response.text[:100]}")
-            break
+            total_count = int(root.find('.//totalCount').text)
+            rows = root.findall('.//row')
+            
+            if not rows: break
 
-        # 2. 서버가 준 XML 텍스트를 파이썬이 이해할 수 있는 트리(Tree) 객체로 바꿉니다.
-        root = ET.fromstring(response.content)
-        
-        # 3. [중요] 전체 결과 수(totalCount)를 찾습니다.
-        # .find('.//totalCount')는 전체 XML에서 totalCount라는 이름의 태그를 딱 하나 찾는 기능입니다.
-        total_count = int(root.find('.//totalCount').text)
-        
-        # 4. 현재 페이지에 들어있는 모든 기관 정보(<row>)를 리스트로 가져옵니다.
-        # .findall('.//row')는 XML 안에 있는 모든 <row> 태그를 다 찾아서 '리스트'로 반환합니다.
-        rows = root.findall('.//row')
-        
-        # 5. [if not rows] 만약 이번 페이지에서 찾은 기관(rows)이 하나도 없다면?
-        if not rows:
-            break  # 더 이상 가져올 데이터가 없다는 뜻이므로 반복문을 끝냅니다.
+            for row in rows:
+                total_raw_count += 1
+                org_id = row.findtext('org_cd')
+                rep_id = row.findtext('rep_cd')
+                
+                # [구조적 필터링] 자기 자신이 대표인 기관만 추출
+                if org_id == rep_id:
+                    head_orgs.append({
+                        "org_cd": org_id,
+                        "full_nm": row.findtext('full_nm'),
+                        "rank": row.findtext('rank_no'),
+                        "type": row.findtext('typemid_nm')
+                    })
             
-        # 6. 이번 페이지에서 찾은 rows들을 아까 만든 큰 바구니(all_rows)에 쏟아붓습니다.
-        all_rows.extend(rows)
-        
-        # 7. 지금까지 모은 개수가 서버가 말한 전체 개수(totalCount)보다 같거나 많아졌나요?
-        if len(all_rows) >= total_count:
-            break  # 모든 데이터를 다 모았으므로 반복문을 끝냅니다.
+            # --- [중간 저장 2] 페이지 단위 체크포인트 ---
+            save_checkpoint(head_orgs, page_no)
+            print(f"✅ {page_no}페이지 완료 (핵심 기관 누적: {len(head_orgs)}개 / 전체 탐색: {total_raw_count})")
+
+            if total_raw_count >= total_count: break
             
-        # 8. 아직 더 남아있다면, 다음 페이지 번호를 1 늘리고 다시 위로 올라가 반복합니다.
-        page_no += 1
-        
-    return all_rows  # 최종적으로 전국 모든 행정기관 데이터가 담긴 바구니를 반환합니다.
+            # --- [차단 방지 3] Throttling ---
+            page_no += 1
+            time.sleep(1) # 서버가 숨 쉴 시간을 줍니다.
+
+        except Exception as e:
+            print(f"❌ 데이터 해석 중 에러: {e}")
+            break
+            
+    return head_orgs
 
 if __name__ == "__main__":
-    print("🚀 데이터 수집을 시작합니다. 잠시만 기다려 주세요...")
-    try:
-        results = fetch_all_gov_data()
-        print(f"\n✅ 수집 완료!")
-        print(f"📊 총 수집된 기관 수: {len(results)}개")
-        
-        # 첫 번째 데이터만 살짝 열어서 확인해보기
-        if results:
-            first_org_name = results[0].findtext('full_nm')
-            print(f"🔍 첫 번째 수집 기관명: {first_org_name}")
-            
-    except Exception as e:
-        print(f"❌ 에러 발생: {e}")
+    results = fetch_head_gov_data()
+    # 최종 결과 저장
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"\n🎉 수집 종료! 최종 {len(results)}개의 핵심 기관 리스트가 {OUTPUT_FILE}에 저장되었습니다.")
