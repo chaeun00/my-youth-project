@@ -1,0 +1,4 @@
+requests==2.31.0
+python-dotenv==1.0.1
+sqlalchemy==2.0.23          # ORM (파이썬 코드로 DB 조작)
+psycopg2-binary==2.9.9      # PostgreSQL 드라이버

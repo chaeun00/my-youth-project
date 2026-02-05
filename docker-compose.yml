@@ -55,9 +55,11 @@ services:
       db:
         condition: service_healthy # DB가 '진짜' 준비될 때까지 대기
 
-  # 4. 스크래퍼 전용 서비스 (테이스용)
+  # 4. 스크래퍼 전용 서비스 (테스트용)
   scraper:
-    image: python:3.10-slim
+    build:
+      context: .
+      dockerfile: deploy/docker/scraper.Dockerfile # 전용 도커파일 지정
     container_name: scraper_app
     volumes:
       - .:/app
@@ -66,7 +68,6 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app/data_engineering
-    command: tail -f /dev/null
     depends_on:
       db:
         condition: service_healthy

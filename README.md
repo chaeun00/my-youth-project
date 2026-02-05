@@ -74,6 +74,7 @@ my-youth-project/
 │   ├── airflow/            # 데이터 파이프라인 DAGs
 │   └── mlflow/             # 실험 관리 설정
 ├── configs/                # 환경 설정 (DB 연결, API Key 등 - .gitignore 필수)
+├── requirements/           # 구동에 필요한 라이브러리와 버전 목록
 └── docker-compose.yml      # 로컬 개발 환경 오케스트레이션
 ```
 

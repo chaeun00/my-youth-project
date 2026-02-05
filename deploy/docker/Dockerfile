@@ -17,10 +17,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 5. 의존성 파일 복사 및 설치
-# (캐싱 효율을 위해 requirements.txt만 먼저 복사합니다)
-COPY requirements.txt .
+COPY requirements/requirements-base.txt requirements/requirements-api.txt ./
+
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements-api.txt
 
 # 6. 전체 프로젝트 코드 복사
 COPY . .
