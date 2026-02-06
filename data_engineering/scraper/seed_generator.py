@@ -86,17 +86,14 @@ def fetch_head_gov_data():
 
             for row in rows:
                 total_raw_count += 1
-                org_id = row.findtext('org_cd')
-                rep_id = row.findtext('rep_cd')
-                
-                # [구조적 필터링] 자기 자신이 대표인 기관만 추출
-                if org_id == rep_id:
-                    head_orgs.append({
-                        "org_cd": org_id,
-                        "full_nm": row.findtext('full_nm'),
-                        "rank": row.findtext('rank_no'),
-                        "type": row.findtext('typemid_nm')
-                    })
+                head_orgs.append({
+                "nm": row.findtext('full_nm'),
+                "mid": row.findtext('typemid_nm'),
+                "rank": row.findtext('rank_no'),
+                "org": row.findtext('org_cd'),
+                "rep": row.findtext('rep_cd'),
+                "high": row.findtext('high_cd')
+            })
             
             # --- [중간 저장 2] 페이지 단위 체크포인트 ---
             save_checkpoint(head_orgs, page_no)
