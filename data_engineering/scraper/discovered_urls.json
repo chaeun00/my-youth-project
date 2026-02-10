@@ -1,7 +1,31 @@
 [
   {
+    "nm": "인천광역시",
+    "url": "https://youth.incheon.go.kr/"
+  },
+  {
+    "nm": "정부24",
+    "url": "https://plus.gov.kr/"
+  },
+  {
+    "nm": "경기도",
+    "url": "https://youth.gg.go.kr/gg/intro/introducing-the-gyeonggi-youth-portal.do"
+  },
+  {
     "nm": "부산광역시",
     "url": "https://young.busan.go.kr/"
+  },
+  {
+    "nm": "전라남도",
+    "url": "https://www.jnyouthcenter.kr/"
+  },
+  {
+    "nm": "충청남도",
+    "url": "https://youth.chungnam.go.kr/web/main/main"
+  },
+  {
+    "nm": "충청북도",
+    "url": "https://www.chungbuk.go.kr/young/index.do"
   },
   {
     "nm": "대구광역시",
@@ -12,40 +36,28 @@
     "url": "https://www.daejeonyouthportal.kr/"
   },
   {
-    "nm": "서울특별시",
-    "url": "https://youth.seoul.go.kr/error.html"
-  },
-  {
-    "nm": "충청남도",
-    "url": "https://youth.chungnam.go.kr/web/main/main"
-  },
-  {
     "nm": "울산광역시",
     "url": "https://www.ulsan.go.kr/s/ulsanyouth/main.ulsan"
   },
   {
-    "nm": "충청북도",
-    "url": "https://www.chungbuk.go.kr/young/index.do"
+    "nm": "강원특별자치도",
+    "url": "http://www.gwep.or.kr/theme/page/html/business/09_4.php"
   },
   {
-    "nm": "인천광역시",
-    "url": "https://youth.incheon.go.kr/"
-  },
-  {
-    "nm": "경기도",
-    "url": "https://youth.gg.go.kr/gg/intro/introducing-the-gyeonggi-youth-portal.do"
+    "nm": "세종특별자치시",
+    "url": "https://www.4242.or.kr/"
   },
   {
     "nm": "경상남도",
     "url": "https://youth.gyeongnam.go.kr/youth/index.es?sid=a1"
   },
   {
-    "nm": "정부24",
-    "url": "https://plus.gov.kr/"
-  },
-  {
     "nm": "제주특별자치도",
     "url": "https://www.jeju.go.kr/youth/"
+  },
+  {
+    "nm": "경상북도",
+    "url": "https://gbyouth.go.kr/"
   },
   {
     "nm": "광주광역시",
@@ -56,20 +68,8 @@
     "url": "https://www.jb2030.or.kr/"
   },
   {
-    "nm": "세종특별자치시",
-    "url": "https://www.4242.or.kr/"
-  },
-  {
-    "nm": "강원특별자치도",
-    "url": "http://www.gwep.or.kr/theme/page/html/business/09_4.php"
-  },
-  {
-    "nm": "경상북도",
-    "url": "https://gbyouth.go.kr/"
-  },
-  {
-    "nm": "전라남도",
-    "url": "https://www.jnyouthcenter.kr/"
+    "nm": "서울특별시",
+    "url": "https://youth.seoul.go.kr/error.html"
   },
   {
     "nm": "고용24",

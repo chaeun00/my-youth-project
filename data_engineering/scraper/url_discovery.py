@@ -20,48 +20,68 @@ def save_to_json(data):
     with open(MAPPED_URL_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+def rank_and_filter_results(items):
+    """
+    검색 결과 리스트를 받아서 점수를 매기고 최적의 URL 하나를 반환합니다.
+    """
+    if not items:
+        return None
+        
+    # 감점/가점 키워드 설정 (제목과 URL 모두에서 검사)
+    PENALTY_KEYWORDS = ["센터", "center", "blog", "cafe", "login", "error"]
+    BONUS_KEYWORDS = ["포털", "portal", "플랫폼", "platform", "정보통", "24", "index.do", "main.do"]
+    
+    scored_results = []
+    for item in items:
+        # 1. 제목과 링크 추출 (딕셔너리/문자열 모두 대응)
+        if isinstance(item, dict):
+            title = item.get('title', '').lower()
+            link = item.get('link', '').lower()
+        else:
+            title = ""  # 제목 정보가 없을 경우 (현재 상황)
+            link = item.lower()
+            
+        score = 100
+        
+        # 2. 저격 필터링 (제목 최우선, URL 차선)
+        for k in PENALTY_KEYWORDS:
+            if k in title or k in link:
+                score -= 70  # 센터는 가차없이 깎습니다.
+        
+        for k in BONUS_KEYWORDS:
+            if k in title or k in link:
+                score += 50  # 포털은 우대합니다.
+
+        scored_results.append((score, item.get('link') if isinstance(item, dict) else item))
+    
+    # 점수 높은 순 정렬 후 1등 반환
+    scored_results.sort(key=lambda x: x[0], reverse=True)
+    return scored_results[0][1]
+
 def call_lambda_clone(query):
-    """람다 분신에게 검색 명령을 내립니다."""
     try:
         response = lambda_client.invoke(
             FunctionName=LAMBDA_FUNCTION_NAME,
             InvocationType='RequestResponse',
             Payload=json.dumps({"query": query})
         )
-        
-        # [해결] 딱 한 번만 읽어서 변수에 저장합니다.
         raw_payload = response['Payload'].read().decode('utf-8')
-        
-        # 이제 변수를 사용하므로 몇 번을 써도 안전합니다.
-        if not raw_payload:
-            print(f"   ⚠️ 응답이 비어있습니다 (Timeout 의심): {query}", flush=True)
-            return None
-
         result = json.loads(raw_payload)
         
-        # 람다 내부에서 에러가 발생했을 경우
-        if result.get('errorMessage'):
-            print(f"   ❌ 람다 내부 로직 에러: {result['errorMessage']}", flush=True)
-            return None
-
-        # 정상적인 statusCode 200 확인
         if result.get('statusCode') == 200:
             body = result.get('body', {})
-            # 람다 설정에 따라 body가 문자열일 수도 있으니 안전하게 처리
-            if isinstance(body, str):
-                body = json.loads(body)
+            if isinstance(body, str): body = json.loads(body)
             
-            urls = body.get('urls', [])
-            return urls[0] if urls else None
+            # 람다는 'urls' 키에 문자열 리스트를 담아줍니다.
+            raw_urls = body.get('urls', [])
             
-        else:
-            print(f"   ⚠️ 람다 응답 실패 ({result.get('statusCode')}): {raw_payload}", flush=True)
-            return None
-
-    except Exception as e:
-        print(f"   ❌ 통신/파싱 에러 ({query}): {str(e)}", flush=True)
+            # 여기서 필터링된 단 하나의 '당첨 URL'만 뱉어냅니다.
+            return rank_and_filter_results(raw_urls)
         return None
-
+    except Exception as e:
+        print(f"   ❌ 통신 에러: {str(e)}")
+        return None
+    
 def validate_and_follow_redirect(url):
     """
     발견된 URL이 리다이렉트되는지 확인하고 최종 도착지 주소를 반환합니다.
@@ -78,23 +98,22 @@ def validate_and_follow_redirect(url):
     except Exception as e:
         # 접속 실패 시 기존 URL 유지 혹은 None 반환
         return url
-
+    
 def process_single_target(target):
-    """기관 1개에 대해 청년 포털 1개의 쿼리만 정밀 타격합니다."""
     name = target['nm']
     is_hub = target.get('type') == 'hub'
     
-    # 허브(정부24/고용24)는 이름 그대로, 지자체는 '청년포털' 키워드 추가
-    query = f"{name} { YOUTH_KEYWORDS if not is_hub else ''}".strip()
+    query = f"{name} {YOUTH_KEYWORDS if not is_hub else ''}".strip()
     
+    # 이제 call_lambda_clone은 리스트가 아니라 '단 하나의 URL'을 줍니다.
     found_url = call_lambda_clone(query)
     
     if found_url:
-        # 허브는 물론, 지자체 포털도 주소 이전을 대비해 리다이렉트 확인
-        # allow_redirects=True를 통해 최종 목적지를 확보합니다.
-        found_url = validate_and_follow_redirect(found_url)
+        # 리다이렉트 최종 확인 후 결과 반환
+        final_url = validate_and_follow_redirect(found_url)
+        return {"nm": name, "url": final_url}
             
-    return {"nm": name, "url": found_url}
+    return {"nm": name, "url": None}
 
 def discover_urls():
     # 1. Seed 타겟 로드
