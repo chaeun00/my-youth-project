@@ -3,3 +3,5 @@
 # --- [데이터 수집 및 검색] ---
 beautifulsoup4==4.12.2     # HTML/XML 파싱 및 웹 페이지 데이터 추출 (제주도 PDF 및 공고문 분석용)
 boto3                      # 사령부(Docker)에서 AWS 리소스(Lambda 등)를 제어하기 위해 사용, 최신 버전
+playwright                 # 브라우저 자동화 및 동적 페이지(대전 인트로 등) 탐색용
+google-genai               # 제미나이(Gemini 1.5 Flash) 호출 및 지능형 네비게이션용

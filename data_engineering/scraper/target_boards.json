@@ -1,0 +1,45 @@
+[
+  {
+    "nm": "대구광역시",
+    "type": "multi",
+    "endpoints": [
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939130",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939131",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939132",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939133",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939137",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939138",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939139",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939140",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939141",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940010",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939142",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940011",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940012",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940013",
+      "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939143"
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "대전광역시",
+    "type": "multi",
+    "endpoints": [
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=1&dpmSectionScd=4&commonMenuNo=438_440_441_443",
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=1&dpmSectionScd=5&commonMenuNo=438_440_441_444",
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=1&dpmSectionScd=6&commonMenuNo=438_440_441_445",
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=1&dpmSectionScd=7&commonMenuNo=438_440_441_446",
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=1&dpmSectionScd=8&commonMenuNo=438_440_441_447",
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=2&dpmSectionScd=9&commonMenuNo=438_440_441_448",
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=2&dpmSectionScd=10&commonMenuNo=438_440_441_449",
+      "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=2&dpmSectionScd=11&commonMenuNo=438_440_441_450"
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "세종특별자치시",
+    "type": "single",
+    "board_url": "https://www.4242.or.kr/total_board",
+    "status": "success"
+  }
+]
