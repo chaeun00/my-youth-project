@@ -13,9 +13,9 @@
   { "nm": "강원특별자치도", "type": "local" },
   { "nm": "충청북도", "type": "local" },
   { "nm": "충청남도", "type": "local" },
-  { "nm": "전북특별자치도", "type": "local" },
+  { "nm": "전라북도", "type": "local" },
   { "nm": "전라남도", "type": "local" },
   { "nm": "경상북도", "type": "local" },
   { "nm": "경상남도", "type": "local" },
-  { "nm": "제주특별자치도", "type": "local" }
+  { "nm": "제주", "type": "local" }
 ]

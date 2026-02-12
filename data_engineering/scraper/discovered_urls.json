@@ -1,78 +1,134 @@
 [
   {
-    "nm": "인천광역시",
-    "url": "https://youth.incheon.go.kr/"
-  },
-  {
-    "nm": "정부24",
-    "url": "https://plus.gov.kr/"
-  },
-  {
-    "nm": "경기도",
-    "url": "https://youth.gg.go.kr/gg/intro/introducing-the-gyeonggi-youth-portal.do"
-  },
-  {
-    "nm": "부산광역시",
-    "url": "https://young.busan.go.kr/"
-  },
-  {
-    "nm": "전라남도",
-    "url": "https://www.jnyouthcenter.kr/"
-  },
-  {
-    "nm": "충청남도",
-    "url": "https://youth.chungnam.go.kr/web/main/main"
-  },
-  {
-    "nm": "충청북도",
-    "url": "https://www.chungbuk.go.kr/young/index.do"
+    "nm": "강원특별자치도",
+    "urls": [
+      "https://job.gwd.go.kr/youth"
+    ]
   },
   {
     "nm": "대구광역시",
-    "url": "http://www.dgyouth.kr/"
+    "urls": [
+      "http://www.dgyouth.kr",
+      "https://www.daegu.go.kr/YouthPolicy"
+    ]
   },
   {
     "nm": "대전광역시",
-    "url": "https://www.daejeonyouthportal.kr/"
+    "urls": [
+      "https://www.daejeonyouthportal.kr",
+      "https://www.daejeon.go.kr/drh/DrhContentsHtmlView.do?menuSeq=6666"
+    ]
   },
   {
-    "nm": "울산광역시",
-    "url": "https://www.ulsan.go.kr/s/ulsanyouth/main.ulsan"
-  },
-  {
-    "nm": "강원특별자치도",
-    "url": "http://www.gwep.or.kr/theme/page/html/business/09_4.php"
-  },
-  {
-    "nm": "세종특별자치시",
-    "url": "https://www.4242.or.kr/"
-  },
-  {
-    "nm": "경상남도",
-    "url": "https://youth.gyeongnam.go.kr/youth/index.es?sid=a1"
-  },
-  {
-    "nm": "제주특별자치도",
-    "url": "https://www.jeju.go.kr/youth/"
-  },
-  {
-    "nm": "경상북도",
-    "url": "https://gbyouth.go.kr/"
-  },
-  {
-    "nm": "광주광역시",
-    "url": "https://youth.gwangju.go.kr/www"
-  },
-  {
-    "nm": "전북특별자치도",
-    "url": "https://www.jb2030.or.kr/"
+    "nm": "제주",
+    "urls": [
+      "https://jejuyouth.com",
+      "https://jejuyouthdream.com"
+    ]
   },
   {
     "nm": "서울특별시",
-    "url": "https://youth.seoul.go.kr/error.html"
+    "urls": [
+      "https://youth.seoul.go.kr",
+      "https://www.smyc.kr/youth_info"
+    ]
+  },
+  {
+    "nm": "울산광역시",
+    "urls": [
+      "https://www.ulsan.go.kr/s/ulsanyouth/main.ulsan",
+      "https://www.bukgu.ulsan.kr/lay1/S1T2039C2077/contents.do"
+    ]
+  },
+  {
+    "nm": "부산광역시",
+    "urls": [
+      "https://young.busan.go.kr",
+      "https://xn--or3b91dba193ggso.kr/view.do?no=137"
+    ]
+  },
+  {
+    "nm": "경기도",
+    "urls": [
+      "https://youth.gg.go.kr/gg/intro/introducing-the-gyeonggi-youth-portal.do",
+      "https://youth.gg.go.kr/gg/home/login.do"
+    ]
+  },
+  {
+    "nm": "세종특별자치시",
+    "urls": [
+      "https://www.4242.or.kr",
+      "https://www2.sejong.go.kr/youth"
+    ]
+  },
+  {
+    "nm": "경상북도",
+    "urls": [
+      "https://gbyouth.go.kr",
+      "https://gbyouth.go.kr/board/list.tc?mn=2390&mngNo=3&pageNo=5026"
+    ]
+  },
+  {
+    "nm": "전라북도",
+    "urls": [
+      "https://www.jb2030.or.kr",
+      "https://www.jeonbuk.go.kr/index.jeonbuk?menuCd=DOM_000000104006005001"
+    ]
+  },
+  {
+    "nm": "전라남도",
+    "urls": [
+      "https://www.jnyouthcenter.kr",
+      "https://www.jeonnam.go.kr/contentsView.do?menuId=brand0401000000"
+    ]
+  },
+  {
+    "nm": "정부24",
+    "urls": [
+      "https://plus.gov.kr",
+      "https://www.gov.kr/mw/AA020InfoCappView.do?CappBizCD=13100000015"
+    ]
+  },
+  {
+    "nm": "인천광역시",
+    "urls": [
+      "https://youth.incheon.go.kr",
+      "https://www.incheon.go.kr/icbenefit/ICB010201"
+    ]
+  },
+  {
+    "nm": "충청북도",
+    "urls": [
+      "https://www.chungbuk.go.kr/young/index.do",
+      "https://www.cbhope1539.net"
+    ]
+  },
+  {
+    "nm": "경상남도",
+    "urls": [
+      "https://youth.gyeongnam.go.kr/youth/index.es?sid=a1",
+      "https://www.youthcenter.go.kr/youthApply/ythPortal/ythPortalMain"
+    ]
+  },
+  {
+    "nm": "충청남도",
+    "urls": [
+      "https://youth.chungnam.go.kr/web/main/main",
+      "https://www.chungnam.go.kr/cnportal/media/article/view.do?articleNo=MD0003007219&menuNo=500190&layerType=all&edate=2024-11-08&sdate=2023-11-08&pageIndex=1"
+    ]
+  },
+  {
+    "nm": "광주광역시",
+    "urls": [
+      "https://youth.gwangju.go.kr/www",
+      "https://gjyouthcenter.kr/index.do"
+    ]
   },
   {
     "nm": "고용24",
-    "url": "https://www.work24.go.kr/"
+    "urls": [
+      "https://www.work24.go.kr",
+      "https://play.google.com/store/apps/details?id=kr.or.keis.mo&hl=ko"
+    ]
   }
 ]
