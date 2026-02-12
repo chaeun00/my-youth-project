@@ -17,9 +17,8 @@ MAX_DEPTH = 2
 
 async def extract_links_from_page(page, base_url):
     """링크 추출 및 1차 키워드 필터링"""
-    # [세종 해결] 청소년, 아동 등은 아예 수집 단계에서 배제
-    IGNORE_KEYWORDS = ["청소년", "아동", "초등", "중등", "고등", "로그인", "회원가입", "이용약관", "개인정보", "페이스북"]
-    TARGET_KEYWORDS = ["공지", "사업", "소식", "정책", "지원", "프로그램", "신청", "목록", "일자리", "주거", "교육", "복지", "참여"]
+    IGNORE_KEYWORDS = ["공지사항", "청소년", "아동", "로그인", "회원가입", "이용약관", "개인정보", "페이스북", "인스타그램", "오시는길"]
+    TARGET_KEYWORDS = ["청년정책", "지원사업", "사업안내", "모집공고", "정책검색", "일자리", "주거", "금융", "복지", "참여"]
     
     links = await page.evaluate('''() => {
         return Array.from(document.querySelectorAll('a')).map(a => ({
@@ -57,34 +56,35 @@ async def ask_gemini_for_navigation(current_url, links, depth):
     청소년 원천 차단
     """
     prompt = f"""
-    너는 웹 구조를 분석하는 '수석 데이터 엔지니어'야. 
-    목표: [지역 청년 정책 목록]을 찾는 것.
-    
+    너는 웹 구조를 꿰뚫어 보는 '수석 데이터 엔지니어'이자 '지능형 네비게이터'야.
+    목표: [실제 청년 정책 리스트가 가장 풍부하게 담긴 페이지]를 찾는 것.
+
     [현재 위치]: {current_url}
     [링크 목록]: {json.dumps(links, ensure_ascii=False, indent=2)}
+
+    [🚫 3대 금지령 - 위반 시 즉시 FAIL]:
+    1. **연령대 오류**: '청소년', '중고생', '어린이' 관련 사이트는 즉시 FAIL. (세종 사례 방지)
+    2. **알맹이 없음**: '추진전략', '법령', '조례', '기관소개' 등 정보성 페이지는 FAIL.
+    3. **단일 공고**: 'XX사업 신청', 'XX지원금 안내' 등 특정 사업 하나만 설명하는 상세 페이지는 FOUND가 아님. 반드시 상위 목록으로 NAVIGATE해. (대전 사례 방지)
+
+    [🚨 필수 준수 사항 - 껍데기(#none) 돌파 및 지역 우선]:
+    - **하위 링크 추적**: 상위 카테고리(예: 청년정책검색) 주소가 `#none`이나 `javascript`여도 절대 포기하지 마. 그 아래에 유효한 URL을 가진 **'서울시 정책'**, **'대전 청년 사업'** 등의 하위 링크가 있다면 그것이 우리의 최종 타겟이야.
+    - **지역 특화 우선순위**: 현재 우리가 사냥 중인 지역명이 포함된 정책 링크(예: 서울시 정책)를 중앙정부나 타 지역 정책보다 **압도적으로 우선시**해서 선택해.
+    - **공지사항 금지**: 제목이 '공지사항'인 곳은 지양하고, 반드시 정책 전용 목록이나 검색 페이지를 찾아.
     
-    [⚠️ 엄격한 금지령]:
-    1. '청소년', '중고생' 관련 링크는 보는 즉시 FAIL. (세종 주의)
-    2. '청년정책 신청'과 같은 '신청'페이지나, 특정 사업명 하나만 있는 '상세 페이지'는 FOUND가 아님. 상위 목록으로 NAVIGATE해. (대전 주의)
+    [🎯 성공 케이스 우선순위 (매우 중요)]:
+    - **Priority 1 (FOUND_SINGLE)**: '서울시 정책', '대전청년사업' 등 지역명이 붙은 **통합 검색/목록** 페이지. (최고의 노다지!)
+    - **Priority 2 (FOUND_SINGLE)**: '청년정책검색', '전체보기', '모든정책' 등 한 페이지에서 필터링하여 모든 정책을 볼 수 있는 곳. (우리가 가장 선호하는 형태!)
+    - **Priority 3 (FOUND_MULTI)**: [일자리/주거/교육] 등 생애주기별/분야별로 메뉴가 나뉘어 있는 포털 메인. 
+       * 이때는 각 카테고리 메뉴들의 URL을 'endpoints' 리스트에 담아줘. (대구 사례 해결)
+    - **Priority 4 (FOUND_SINGLE)**: 통합 검색은 없지만, '지원사업안내'처럼 정책만 모아둔 단일 게시판.
 
-    [⚠️ 필수 준수 사항]:
-    - NAVIGATE를 선택했다면, 위 [링크 목록] 중 하나를 반드시 `target_url`에 복사해 넣어야 해.
-    - '신청' 등의 페이지라면 상위 메뉴인 '청년정책'이나 'XX지역 청년사업' 링크를 찾아. 절대 빈카드로 두지 마!
-
-    [🎯 판단 기준 - 두 가지 성공 케이스]:
-    Case A. **FOUND_SINGLE**: '공지사항'이나 '사업안내'처럼 하나의 게시판에 모든 정책이 리스트로 있는 경우.
-    Case B. **FOUND_MULTI** (대구 스타일): '일자리', '주거', '교육', '복지' 처럼 **카테고리별로 메뉴가 나뉘어 있는 포털 메인**인 경우.
-       - 이때는 해당 카테고리 메뉴들의 URL을 'endpoints' 리스트에 담아줘.
-
-    [🎯 판단 기준 - 실패 케이스]:
-    Case C **FAIL**: 제목 혹은 카테고리가 정책이 아닌, '청소년', '이용기관', '센터', '일반 공지사항'에 치중된 경우
-
-    JSON 응답:
+    JSON 응답 형식:
     {{
         "action": "FOUND_SINGLE" | "FOUND_MULTI" | "NAVIGATE" | "FAIL",
-        "target_url": "URL (SINGLE/NAVIGATE용)",
-        "endpoints": ["URL1", "URL2", ...] (MULTI용, 위 링크 목록에서 발췌),
-        "reason": "설명"
+        "target_url": "FOUND_SINGLE 또는 NAVIGATE일 때 이동할 URL",
+        "endpoints": ["MULTI일 때만 채우는 리스트"],
+        "reason": "구조적 분석 근거 (예: 통합 검색 페이지가 존재하므로 멀티 카테고리보다 우선 선택함)"
     }}
     """
     
@@ -221,24 +221,45 @@ async def process_region(region_data):
 
 async def main():
     if not os.path.exists(INPUT_FILE):
-        print("❌ discovered_urls.json 없음")
+        print("❌ discovered_urls.json 파일을 먼저 생성해주세요.")
         return
 
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         targets = json.load(f)
 
-    test_targets = [t for t in targets if t['nm'] in ["대전광역시", "세종특별자치시", "대구광역시"]]
-    
-    results = []
-    for target in test_targets:
-        result = await process_region(target)
-        results.append(result)
-        await asyncio.sleep(2) # 예의상 휴식
+    print(f"🔥 총 {len(targets)}개 지역에 대한 '지능형 탐색'을 시작합니다.")
+    print("---------------------------------------------------")
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+    results = []
     
-    print(f"\n✨ 완료! {OUTPUT_FILE} 확인 바람.")
+    # [변경] 테스트 필터(test_targets) 제거! -> targets 전체 순회
+    for i, target in enumerate(targets):
+        region_name = target['nm']
+        print(f"\n[{i+1}/{len(targets)}] 🚩 {region_name} 진입")
+        
+        try:
+            # 지역 탐색 실행
+            result = await process_region(target)
+            results.append(result)
+            
+            # [핵심] 한 지역이 끝날 때마다 파일에 '중간 저장'을 합니다.
+            # 혹시라도 중간에 멈추더라도 데이터는 남습니다.
+            with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False, indent=2)
+            print(f"   💾 {region_name} 탐색 결과 저장 완료")
+
+        except Exception as e:
+            print(f"   💥 {region_name} 처리 중 치명적 오류: {e}")
+            # 에러가 나도 다음 지역으로 넘어갑니다.
+        
+        # 구글 API 및 서버 부하를 줄이기 위한 매너 휴식 (3초)
+        print("   ☕ 잠시 숨 고르기 (3초)...")
+        await asyncio.sleep(3)
+
+    print("\n" + "="*50)
+    print(f"✨ 모든 사냥 종료! 최종 결과가 {OUTPUT_FILE}에 저장되었습니다.")
+    print(f"✨ 총 발견된 지역 수: {len(results)}")
+    print("="*50)
 
 if __name__ == "__main__":
     asyncio.run(main())

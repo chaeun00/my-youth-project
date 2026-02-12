@@ -1,5 +1,12 @@
 [
   {
+    "nm": "서울특별시",
+    "urls": [
+      "https://youth.seoul.go.kr",
+      "https://www.smyc.kr/youth_info"
+    ]
+  },
+  {
     "nm": "강원특별자치도",
     "urls": [
       "https://job.gwd.go.kr/youth"
@@ -24,13 +31,6 @@
     "urls": [
       "https://jejuyouth.com",
       "https://jejuyouthdream.com"
-    ]
-  },
-  {
-    "nm": "서울특별시",
-    "urls": [
-      "https://youth.seoul.go.kr",
-      "https://www.smyc.kr/youth_info"
     ]
   },
   {
