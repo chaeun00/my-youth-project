@@ -1,8 +1,12 @@
 [
   {
     "nm": "서울특별시",
-    "type": "single",
-    "board_url": "https://youth.seoul.go.kr/bbs/list.do?key=2303300002&sc_bbsCtgrySn=2304110001",
+    "type": "multi",
+    "endpoints": [
+      "https://youth.seoul.go.kr/bbs/list.do?key=2303300002&sc_bbsCtgrySn=2304110001",
+      "https://youth.seoul.go.kr/infoData/plcyInfo/list.do?key=2309150002",
+      "https://youth.seoul.go.kr/infoData/youthPlcyInfo/list.do?key=2309160001"
+    ],
     "status": "success"
   }
 ]
