@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from urllib.parse import unquote # 키 값을 안전하게 처리하기 위해 필요합니다.
 from constants import METRO_LIST
 
-load_dotenv()  # .env 파일에 숨겨둔 API 키를 가져옵니다.
+ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", ".env")
+load_dotenv(dotenv_path=ENV_PATH)  # configs/.env 파일에 숨겨둔 API 키를 가져옵니다.
 
 # 경로 및 URL 설정
 BASE_DIR = "data_engineering/scraper"
@@ -38,7 +39,7 @@ def handle_api_error(code, msg):
         return -1 # 분석 불가 시 안전하게 -1 반환
 
     if code_int in [290, 300]:
-        print("   -> 🔑 인증키(API KEY) 권한 에러. .env를 확인하세요.")
+        print("   -> 🔑 인증키(API KEY) 권한 에러. configs/.env를 확인하세요.")
         sys.exit(1)
     elif code_int in [310, 333, 336]:
         print(f"   -> 🐛 파라미터 혹은 요청 건수 에러. 코드를 수정해야 합니다.")
@@ -121,7 +122,7 @@ def validate_api_status(service_key):
 
 
 def fetch_head_gov_data(service_key):
-    # .env에서 키를 가져온 뒤, 혹시 모르니 unquote로 디코딩 상태를 보장합니다.
+    # configs/.env에서 키를 가져온 뒤, 혹시 모르니 unquote로 디코딩 상태를 보장합니다.
     
     checkpoint = load_checkpoint()
     head_orgs = checkpoint["data"]  # 수집한 모든 기관 데이터(<row>)를 담을 바구니(리스트)입니다.

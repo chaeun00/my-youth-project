@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from db_handler import DBHandler
 
-env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+env_path = Path(__file__).resolve().parent.parent.parent / 'configs' / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # 환경 변수에서 값 가져오기

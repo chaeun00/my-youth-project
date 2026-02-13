@@ -38,6 +38,8 @@ certs/
 # === 4. Secrets & Configs (환경 변수) ===
 .env
 .env.local
+configs/.env
+configs/.env.local
 configs/auth_key.json
 secrets/
 

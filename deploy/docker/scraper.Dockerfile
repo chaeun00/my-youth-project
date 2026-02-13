@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     grep \
     sed \
-    poppler-utils \ 
+    poppler-utils \
     # Playwright가 브라우저를 띄울 때 필요한 최소한의 라이브러리들
     libglib2.0-0 \
     libnss3 \

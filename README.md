@@ -130,21 +130,22 @@ git clone [https://github.com/your-username/my-youth-project.git](https://github
 cd my-youth-project
 ```
 
-2. **Environment Setup** `configs/` 폴더 내에 `.env` 파일을 생성하고 필요한 키 값을 입력합니다.
+2. **Environment Setup** `configs/.env.example`를 복사해 `configs/.env`를 만들고 필요한 값을 입력합니다.
 ```
-cp configs/env.example configs/.env
+cp configs/.env.example configs/.env
 ```
+> 보안 원칙: `configs/.env`는 절대 공유/커밋하지 마세요. 기존 실키는 즉시 로테이션 후 새 키로 교체하세요.
 
 3. **Run with Docker Compose** DB와 API 서버를 실행합니다.
 ```
-docker-compose up -d --build
+docker compose --env-file configs/.env up -d --build
 ```
 
 4. **Check Status**
 
 - API Docs: `http://localhost:8000/docs`
 
-- DB Admin: `http://localhost:5050` (pgAdmin)
+- DB Admin: `http://localhost:8080` (pgAdmin)
 
 ---
 
