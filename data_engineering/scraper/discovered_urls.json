@@ -83,13 +83,6 @@
     ]
   },
   {
-    "nm": "정부24",
-    "urls": [
-      "https://plus.gov.kr",
-      "https://www.gov.kr/mw/AA020InfoCappView.do?CappBizCD=13100000015"
-    ]
-  },
-  {
     "nm": "인천광역시",
     "urls": [
       "https://youth.incheon.go.kr",
@@ -122,13 +115,6 @@
     "urls": [
       "https://youth.gwangju.go.kr/www",
       "https://gjyouthcenter.kr/index.do"
-    ]
-  },
-  {
-    "nm": "고용24",
-    "urls": [
-      "https://www.work24.go.kr",
-      "https://play.google.com/store/apps/details?id=kr.or.keis.mo&hl=ko"
     ]
   }
 ]

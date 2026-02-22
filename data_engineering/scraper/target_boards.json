@@ -2,9 +2,461 @@
   {
     "nm": "서울특별시",
     "type": "multi",
-    "endpoints": [
-      "https://youth.seoul.go.kr/infoData/plcyInfo/list.do?key=2309150002",
-      "https://youth.seoul.go.kr/infoData/youthPlcyInfo/list.do?key=2309160001"
+    "target_data": [
+      {
+        "category": "서울시 정책",
+        "url": "https://youth.seoul.go.kr/infoData/plcyInfo/list.do?key=2309150002",
+        "action": "click",
+        "target_text": "서울시 정책(335건)"
+      },
+      {
+        "category": "자치구 정책",
+        "url": "https://youth.seoul.go.kr/infoData/plcyInfo/list.do?key=2309150002",
+        "action": "click",
+        "target_text": "자치구 정책(335건)"
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "강원특별자치도",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://job.gwd.go.kr/youth/policies/search",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "대구광역시",
+    "type": "multi",
+    "target_data": [
+      {
+        "category": "일자리",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939131",
+        "action": "click",
+        "target_text": "일자리"
+      },
+      {
+        "category": "주거",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939132",
+        "action": "click",
+        "target_text": "주거"
+      },
+      {
+        "category": "교육",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939133",
+        "action": "click",
+        "target_text": "교육"
+      },
+      {
+        "category": "일자리",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939137",
+        "action": "click",
+        "target_text": "일자리"
+      },
+      {
+        "category": "교육",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939138",
+        "action": "click",
+        "target_text": "교육"
+      },
+      {
+        "category": "복지문화",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939139",
+        "action": "click",
+        "target_text": "복지문화"
+      },
+      {
+        "category": "일자리",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939140",
+        "action": "click",
+        "target_text": "일자리"
+      },
+      {
+        "category": "주거",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939141",
+        "action": "click",
+        "target_text": "주거"
+      },
+      {
+        "category": "교육",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940010",
+        "action": "click",
+        "target_text": "교육"
+      },
+      {
+        "category": "복지문화",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939142",
+        "action": "click",
+        "target_text": "복지문화"
+      },
+      {
+        "category": "주거",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940011",
+        "action": "click",
+        "target_text": "주거"
+      },
+      {
+        "category": "교육",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940012",
+        "action": "click",
+        "target_text": "교육"
+      },
+      {
+        "category": "복지문화",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940013",
+        "action": "click",
+        "target_text": "복지문화"
+      },
+      {
+        "category": "참여권리",
+        "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939143",
+        "action": "click",
+        "target_text": "참여권리"
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "제주",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://jejuyouthdream.com/support-policy?mainCategory=%EC%A0%84%EC%B2%B4",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "대전광역시",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://www.daejeonyouthportal.kr/biz/businessIntro.do?dpmSectionFst=100&dpmSectionScd=4&commonMenuNo=438_440_441_442",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "울산광역시",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://www.ulsan.go.kr/s/ulsanyouth/bbs/list.ulsan?bbsId=BBS_0000000000000316&mId=008001001000000000",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "부산광역시",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://young.busan.go.kr/policySupport/list.nm",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "경기도",
+    "type": "multi",
+    "target_data": [
+      {
+        "category": "일자리",
+        "url": "https://youth.gg.go.kr/gg/intro/youth-policy-job-test.do",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "주거",
+        "url": "https://youth.gg.go.kr/gg/intro/youth-policy-educational-testing.do",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "금융/복지/문화",
+        "url": "https://youth.gg.go.kr/gg/intro/youth-policy-housing-test.doo",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "교육/직업훈련",
+        "url": "https://youth.gg.go.kr/gg/intro/youth-policy-culture-test.do",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "시/군/구 정책",
+        "url": "https://youth.gg.go.kr/gg/info/archive-policy-search-map.do?mode=list&&pagerLimit=8&pager.offset=0",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "세종특별자치시",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://www.4242.or.kr/total_board",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "경상북도",
+    "type": "multi",
+    "target_data": [
+      {
+        "category": "경상북도",
+        "url": "https://gbyouth.go.kr/policy/list.tc?mn=2379&pageNo=5069",
+        "action": "click",
+        "target_text": "경상북도"
+      },
+      {
+        "category": "시/군",
+        "url": "https://gbyouth.go.kr/policy/list.tc?mn=2379&pageNo=5069",
+        "action": "click",
+        "target_text": "시/군"
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "전라북도",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://www.jb2030.or.kr/policy/p2.html",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "광주광역시",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://youth.gwangju.go.kr/www/50?siteId=www&url=%2Fwww%2Fpolicy%2FgjYgPolicyList",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "충청남도",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://youth.chungnam.go.kr/web/main/customSupp/list",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "경상남도",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://youth.gyeongnam.go.kr/youth/youthPolicySearchPageNew.es?page_no=1&mid=a10101020000&count_list=9&policy_subject_office=0&orderby=LATEST",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "인천광역시",
+    "type": "single",
+    "target_data": [
+      {
+        "category": "search",
+        "url": "https://youth.incheon.go.kr/policy/search_incheon.jsp",
+        "action": "direct",
+        "target_text": null
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "전라남도",
+    "type": "multi",
+    "target_data": [
+      {
+        "category": "일자리",
+        "url": "https://brand.jeonnam.go.kr/contentsView.do?menuId=brand0401000000",
+        "action": "click",
+        "target_text": "일자리"
+      },
+      {
+        "category": "주거",
+        "url": "https://brand.jeonnam.go.kr/contentsView.do?menuId=brand0401000000",
+        "action": "click",
+        "target_text": "주거"
+      },
+      {
+        "category": "교육",
+        "url": "https://brand.jeonnam.go.kr/contentsView.do?menuId=brand0401000000",
+        "action": "click",
+        "target_text": "교육"
+      },
+      {
+        "category": "복지/문화",
+        "url": "https://brand.jeonnam.go.kr/contentsView.do?menuId=brand0401000000",
+        "action": "click",
+        "target_text": "복지/문화"
+      },
+      {
+        "category": "참여/권리",
+        "url": "https://brand.jeonnam.go.kr/contentsView.do?menuId=brand0401000000",
+        "action": "click",
+        "target_text": "참여/권리"
+      }
+    ],
+    "status": "success"
+  },
+  {
+    "nm": "충청북도",
+    "type": "multi",
+    "target_data": [
+      {
+        "category": "충북행복결혼공제",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4949",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "재직 청년근로자 근속 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4950",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "취업준비생 레벨업 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4951",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "기업 초청 토크콘서트",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4952",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "일 경험 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4954",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "청년성장프로젝트",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5073",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "충청북도 현장형 청년인턴",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5408",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "청년 소상공인 창업응원금 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4971",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "청년 창업지원자금 융자지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4973",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "청년월세 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5042",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "대학생 학자금 이자 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5045",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "생식세포 동결ㆍ보존 등 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4840",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "출산육아수당",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4946",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "충북 다자녀 행복카드",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=4837",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "우리아이 먹거리 할인쿠폰 지원",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5138",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "인구감소지역 결혼지원금 사업",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5409",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "맘(Mom)편한 태교 패키지 지원 사업",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5410",
+        "action": "direct",
+        "target_text": null
+      },
+      {
+        "category": "군 지역 임산부 교통비 지원 사업",
+        "url": "https://www.chungbuk.go.kr/young/contents.do?key=5411",
+        "action": "direct",
+        "target_text": null
+      }
     ],
     "status": "success"
   }

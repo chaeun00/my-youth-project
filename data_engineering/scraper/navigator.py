@@ -11,26 +11,21 @@ INPUT_FILE = os.path.join(BASE_DIR, "discovered_urls.json")
 OUTPUT_FILE = os.path.join(BASE_DIR, "target_boards.json")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# 제미나이 클라이언트 생성
 client = genai.Client(api_key=GOOGLE_API_KEY)
-
 MAX_DEPTH = 4
+MAX_RETRIES = 2 # 실패 시 재시도 횟수
 
 async def get_page_summary(page):
-    """
-    페이지의 상단 텍스트 2000자만 추출합니다.
-    이유: 제미나이에게 '이 페이지가 공지사항인지, 정책 목록인지' 판단할 컨텍스트를 제공하면서도
-    토큰 비용을 아끼기 위함입니다.
-    """
     try:
-        text = await page.evaluate("document.body.innerText")
-        cleaned_text = ' '.join(text.split())
-        return cleaned_text[:2000]
-    except Exception:
-        return ""
+        data = await page.evaluate('''() => {
+            const hasTable = document.querySelector('table') ? "TABLE_PRESENT" : "NO_TABLE";
+            const hasPaging = document.querySelector('.paging, .pagination, [class*="page"]') ? "PAGING_PRESENT" : "NO_PAGING";
+            return `${hasTable} | ${hasPaging} | ${document.body.innerText.slice(0, 2000)}`;
+        }''')
+        return data.replace('\\n', ' ')
+    except: return ""
 
 async def extract_links_from_page(page, base_url):
-    """링크 추출 및 1차 키워드 필터링"""
     IGNORE_KEYWORDS = [
         "로그인", "회원가입", "이용약관", "개인정보", "페이스북", "인스타그램", "오시는길", 
         "청소년", "아동", "초등", "중등", "고등", "육아", "노인",
@@ -38,24 +33,22 @@ async def extract_links_from_page(page, base_url):
     ]
     TARGET_KEYWORDS = [
         "청년", "정책", "사업", "지원", "공고", "모집", "검색", "목록", 
-        "일자리", "주거", "교육", "복지", "참여", "금융", "시", "자치구" 
+        "일자리", "주거", "교육", "복지", "참여", "금융", "시", "자치구",
+        "사회진입", "정착", "공통"
     ]
-    
     try:
         links = await page.evaluate('''() => {
             return Array.from(document.querySelectorAll('a')).map(a => ({
                 text: a.innerText.trim(),
-                href: a.href, // 브라우저가 완성한 Full URL
-                raw_href: a.getAttribute('href') || "", // 비교용 원본
+                href: a.href, 
+                raw_href: a.getAttribute('href') || "", 
                 onclick: a.getAttribute('onclick') || ""
             }));
         }''')
-    except:
-        return []
+    except: return []
     
     filtered_links = []
     seen_urls = set()
-
     for link in links:
         text = link['text'].replace('\n', ' ')
         full_url = link['href']
@@ -63,92 +56,83 @@ async def extract_links_from_page(page, base_url):
         onclick = link['onclick']
         
         if not text or not full_url: continue
-        
         is_js_link = "#none" in raw_href or raw_href.startswith("javascript")
-        
-        if is_js_link and not onclick:
-            continue
-            
+        if is_js_link and not onclick: continue
         if full_url in seen_urls and not is_js_link: continue
-        
-        if any(bad in text for bad in IGNORE_KEYWORDS):
-            continue
+        if any(bad in text for bad in IGNORE_KEYWORDS): continue
             
         if any(good in text for good in TARGET_KEYWORDS) or "바로가기" in text or "홈페이지" in text or "더보기" in text:
-            filtered_links.append({"text": text, "url": full_url, "onclick": onclick})
+            filtered_links.append({"text": text, "url": full_url, "raw_href": raw_href, "onclick": onclick})
             seen_urls.add(full_url)
-            
     return filtered_links[:50]
 
 async def ask_gemini_for_navigation(region_name, current_url, links, page_text, depth):
     prompt = f"""
     너는 [{region_name}]의 청년 정책 데이터를 수집하는 '수석 데이터 엔지니어'이자 '지능형 네비게이터'야.
-    목표: **오직 [{region_name}] 지자체와 그 소속 자치구가 직접 시행하는 순수 정책 리스트** 이면서, **요약본이 아닌, 모든 정책이 나열되는 [진짜 목록 페이지]**를 찾는 것.
+    목표: **[{region_name}] 관할(본청/자치구) 순수 청년 정책이 모두 나열된 [진짜 목록 페이지]**를 찾아, 스크래퍼가 클릭할 **'정확한 버튼 지령'**을 만드는 것.
 
     [현재 상황]: {region_name} | {current_url} | Depth: {depth}/{MAX_DEPTH}
     [페이지 요약]: {page_text}
     [링크 후보]: {json.dumps(links, ensure_ascii=False, indent=2)}
 
-    **경고**: URL에 'error', '404'가 포함되어 있다면 즉시 FAIL을 선언하고 탈출하라.
-    *(주의 1: URL이 그럴듯해도 위 요약 내용에 '중앙정부', '전국공통', '청소년'이 주를 이룬다면 즉시 FAIL이다.)*
-    *(주의 2: 단일 정책 페이지를 발견한 것 같다고 판단되더라도, 요약에 '더보기'나 '전체보기' 버튼이 있다면 현재 페이지는 '맛보기'일 뿐이다. 그 버튼의 주소가 `#none`이고 `onclick`이 있어도, 그걸 클릭해야 리스트가 나온다는 것을 인지하고 타겟으로 잡아라.)*
+    =========================================
+    [사냥 알고리즘: 시간순 진행]
 
-    [🚫 즉시 실패(FAIL) 기준 - 위반 시 미션 실패]:
-    1. **중앙정부/타지역 배제**: '중앙정부', '정부24', '전국공통', '타 지자체' 정책은 쓰레기다. 절대 수집하지 마라.
-    2. **연령대 오류**: 내용에 '청소년', '중고생', '아동', '노인'이 포함되면 즉시 FAIL.
-    3. **행정/노이즈 제거**: 인사말, 조직도, 법령, 조례, 연구자료, 캘린더, 일정표 페이지는 무시하라.
-    4. **가짜 리스트(BBS)**: 제목은 '공지사항'인데 내용이 '직원 채용', '입찰 공고', '단순 행사 안내'뿐이라면 정책 리스트가 아니다. 과감히 FAIL하라.
-    5. **상세 페이지 함정**: 특정 사업 하나(예: XX지원금 신청)만 설명하는 상세 페이지는 목록이 아니다. 상위 목록으로 NAVIGATE하라.
+    ▶ 1단계: 즉시 탈출 (FAIL) 검열
+    현재 페이지가 아래 중 하나라면 즉시 FAIL하라.
+    - 접근 불가: URL에 'error', '404' 포함
+    - 대상 오류: '청소년', '중고생', '아동', '노인' 위주의 내용
+    - 주체 오류: '중앙정부', '정부24', '전국공통', '타 지자체' 주도 정책
+    - 노이즈: 인사말, 조직도, 법령/조례, 단순 공지사항(직원채용/입찰/행사 등)
+      *(단, 노이즈 페이지라도 링크 후보 중에 '{region_name} 정책', '사업공고' 등 3단계 타겟 버튼이 있다면 FAIL 대신 NAVIGATE 할 것)*
 
-    [🚨 기술적 돌파 지침]:
-    1. **인트로(Intro) 돌파**: '정책정보 바로가기', '메인 입장', '홈페이지 바로가기' 버튼이 보이면 고민 없이 NAVIGATE하여 본진으로 진입하라.
-    2. **#none 돌파**: '더보기' 링크의 href가 `#none`이어도 텍스트가 명확하면 그 버튼을 타겟으로 잡아라.
-    3. **내용 기반 판단**: URL 키워드보다 [페이지 요약]에 담긴 **실제 텍스트 내용**을 보고 현재 지역의 정책이 맞는지 1순위로 판단하라.
+    ▶ 2단계: 껍데기 돌파 (NAVIGATE)
+    아직 '진짜 목록'이 아니다. 아래에 해당하면 상위/하위 메뉴나 '더보기' 버튼으로 NAVIGATE하라.
+    - 인트로/허브: '정책정보 바로가기', '메인 입장' 또는 여러 카테고리를 안내하는 메뉴판 페이지
+    - 맛보기/가짜 리스트: 요약에 정책이 몇 개 보이나 '더보기/전체보기' 버튼이 있는 경우, 혹은 **테이블(표)이나 페이징(1,2,3..) 버튼이 아예 없는 경우**
+    - 상세 페이지: 특정 사업 하나(예: XX지원금 신청)만 길게 설명하는 경우
 
-    [🎯 성공(FOUND) 및 멀티 섹션 판정]:
-    - **Priority 1 (FOUND_MULTI)**: 한 페이지에 '{region_name} 자체 정책'과 '자치구(구청) 정책' 섹션이 나뉘어 있고, 각 섹션의 건수(Count)가 표시된 '더보기 >' 링크가 따로 존재하는 경우. -> **중앙정부 링크는 빼고** 이 두 가지만 endpoints에 담아라.
-    - **Priority 2 (FOUND_SINGLE)**: '{region_name} 정책'만 순수하게 모아둔 통합 검색/목록 페이지.
+    ▶ 3단계: 목표물 포착 및 타겟팅 (버튼 사수)
+    - **🔥통합 게시판 최우선 법칙**: '전체보기', '통합목록', '통합검색' 등 모든 정책이 한곳에 모인 게시판을 발견하면 1순위 타겟으로 삼아라. 개별 카테고리(일자리, 주거 등) 버튼들은 통합 게시판이 없을 때만 수집하라.
+    - **키워드 우선순위**: '청년정책(Policy)', '검색/통합검색', '사업(Project)', '공고/모집' 위주로 탐색하라. ('지원(Support)', '정보(Info)', '전략'은 배제)
+    - **동적 버튼 사수**: 주소가 `#none`이거나 현재와 같아도, 리스트를 부르는 **버튼의 정확한 텍스트(예: "XX시 정책(A건)")**를 찾아 타겟으로 잡아라.
+
+    ▶ 4단계: 최종 판정 (FOUND_SINGLE / FOUND_MULTI)
+    - **Priority 1 (FOUND_SINGLE)**: 1~2단계 결격 사유가 없는, 모든 장르를 포괄하는 통합 정책 검색/목록 페이지.
+    - **Priority 2 (FOUND_MULTI)**: 통합 게시판을 도저히 찾을 수 없어 여러 카테고리를 뒤져야 하는 경우, 아래 버튼들의 텍스트를 빠짐없이 `endpoints`에 담아라.
+      (1) '{region_name} 본청 정책'과 '시/군/구(자치구) 정책' 탭이 나뉘어 있는 경우.
+      (2) '일자리', '주거', '교육', '복지', '사회진입기' 등 장르별 청년정책 카테고리 버튼들.
+    =========================================
 
     JSON 응답 형식:
     {{
         "action": "FOUND_SINGLE" | "FOUND_MULTI" | "NAVIGATE" | "FAIL",
-        "target_url": "이동할 URL (절대 경로)",
-        "endpoints": ["오직 {region_name} 시청 정책 URL", "오직 {region_name} 산하 구청 정책 URL"],
-        "reason": "중앙정부/타지역은 배제하고 {region_name} 순혈 정책 리스트만 선택한 근거"
+        "target_url": "이동할 URL 또는 클릭할 버튼 텍스트",
+        "endpoints": ["클릭할 버튼 텍스트/URL 1", "..."],
+        "reason": "1~4단계 알고리즘 논리적 판단 근거"
     }}
     """
-    
     try:
-        # 가성비 모델 사용 (Flash Lite)
-        response = client.models.generate_content(
-            model='gemini-2.5-flash-lite', 
-            contents=prompt,
-            config={'response_mime_type': 'application/json'}
-        )
+        response = client.models.generate_content(model='gemini-2.5-flash-lite', contents=prompt, config={'response_mime_type': 'application/json'})
         return json.loads(response.text)
     except Exception as e:
         print(f"   ❌ 제미나이 에러: {e}")
-        return {"action": "FAIL", "reason": "API Error"}
+        return {"action": "FAIL"}
 
-async def navigate_single_candidate(region_name, browser, start_url):
-    page = await browser.new_page()
+async def navigate_single_candidate(region_name, context, start_url):
+    page = await context.new_page()
     current_url = start_url
-    
     try:
         for depth in range(MAX_DEPTH + 1):
             print(f"   탐색 중... [Depth {depth}] {current_url}")
-
-            if "error" in current_url.lower() or "404" in current_url:
-                print(f"   ⚠️ 에러 페이지 감지: {current_url}")
-                break
+            if "error" in current_url.lower() or "404" in current_url: break
 
             try:
-                await page.goto(current_url, wait_until="load", timeout=30000)
+                await page.goto(current_url, wait_until="domcontentloaded", timeout=20000)
                 await asyncio.sleep(2)
                 current_url = page.url 
             except Exception:
-                print(f"   ⚠️ 접속 실패: {current_url}")
-                break
+                print(f"   ⚠️ 접속 지연 무시 (강행)")
 
             page_text = await get_page_summary(page)
             links = await extract_links_from_page(page, current_url)
@@ -161,158 +145,192 @@ async def navigate_single_candidate(region_name, browser, start_url):
             
             print(f"   🤖 제미나이: {action} -> {reason}")
             
-            async def move_to_target(url_to_go):
-                if not url_to_go or "http" not in url_to_go: return False
-                try:
-                    if "#none" in url_to_go or "javascript" in url_to_go:
-                        target_link = next((l for l in links if l['url'] == url_to_go), None)
-                        if target_link:
-                            await page.get_by_role("link", name=target_link['text']).first.click()
-                            return True
-                    else:
-                        await page.goto(url_to_go, wait_until="load", timeout=30000)
+            def build_instruction(hint):
+                if not hint: return None
+                if "http" in hint and "#none" not in hint and "javascript" not in hint:
+                    category_name = hint.split('/')[-1] if '/' in hint else hint
+                    return {"category": category_name, "url": hint, "action": "direct", "target_text": None}
+                
+                target_link = next((l for l in links if hint in l['text'] or l['text'] in hint), None)
+                found_text = target_link['text'] if target_link else hint
+                return {"category": found_text, "url": page.url, "action": "click", "target_text": found_text}
+
+            async def move_to_target(url_or_text):
+                if not url_or_text: return False
+                if "http" in url_or_text and "#none" not in url_or_text:
+                    try:
+                        await page.goto(url_or_text, wait_until="domcontentloaded", timeout=20000)
                         return True
-                except:
-                    return False
+                    except: return False
+                try:
+                    target_link = next((l for l in links if l['text'] == url_or_text or url_or_text in l['text']), None)
+                    if target_link:
+                        await page.get_by_role("link", name=target_link['text']).first.click(timeout=5000)
+                        return True
+                except: return False
                 return False
 
             if action == "FOUND_SINGLE":
-                final_url = urljoin(page.url, target) if target and "#none" not in target else current_url
-                print(f"   🎉 단일 게시판 발견: {final_url}")
-                return {"type": "single", "url": final_url, "reason": reason}
+                return {"type": "single", "target_data": [build_instruction(target or current_url)]}
 
             elif action == "FOUND_MULTI":
-                # [수정] 멀티 엔드포인트도 모두 절대 경로로 변환하여 저장
-                abs_endpoints = [urljoin(page.url, ep) for ep in endpoints]
-                print(f"   🎉 멀티 카테고리 발견 ({len(abs_endpoints)}개)")
-                return {"type": "multi", "endpoints": abs_endpoints, "reason": reason}
+                instructions = [build_instruction(ep) for ep in endpoints if ep]
+                return {"type": "multi", "target_data": [i for i in instructions if i]}
             
             elif action == "NAVIGATE":
                 if not target:
-                    # 강제 키워드 탐색
-                    keywords = ["더보기", "전체보기", "목록", "검색", "정책", region_name]
-                    for kw in keywords:
-                        fallback = next((l['url'] for l in links if kw in l['text']), None)
-                        if fallback:
-                            target = fallback; break
+                    for kw in ["더보기", "전체보기", "목록", "검색", "정책", region_name]:
+                        fallback = next((l['text'] for l in links if kw in l['text']), None)
+                        if fallback: target = fallback; break
                 
                 if target:
-                    success = await move_to_target(target)
-                    if success:
+                    if await move_to_target(target):
                         await asyncio.sleep(2)
                         current_url = page.url
                         continue
                 break
-            else:
-                break
-                
-    except Exception as e:
-        print(f"   ❌ 런타임 오류: {e}")
-    finally:
-        await page.close()
-    
+            elif action == "FAIL":
+                return None
+            else: break
+    finally: await page.close()
     return None
+
 async def select_the_best_one(region_name, findings):
-    """
-    여러 후보 중 '지역 특화' 및 '정보량' 기준으로 우승자를 뽑습니다.
-    """
     prompt = f"""
     [{region_name}]의 청년 정책을 수집하기에 가장 완벽한 곳을 골라줘.
-
     [후보 목록]: {json.dumps(findings, ensure_ascii=False, indent=2)}
-
-    [🏆 우승 기준]:
-    1. **지역 브랜딩**: 설명에 "{region_name}"이 명확히 포함된 곳이 중앙정부 링크보다 우위.
-    2. **정보의 양**: 단순 공지사항보다는 '멀티 카테고리'나 '통합 검색' 페이지가 우위.
-    3. **정확성**: '청소년' 관련 사이트는 탈락.
-
+    [🏆 우승 기준]: 1. 지역 브랜딩 우선, 2. 멀티/통합검색 우선, 3. 청소년 사이트 탈락.
     JSON 응답: {{ "best_index": 0 또는 1 }}
     """
+    try:
+        res = client.models.generate_content(model='gemini-2.5-flash-lite', contents=prompt, config={'response_mime_type': 'application/json'})
+        return findings[json.loads(res.text)['best_index']]
+    except:
+        return next((f for f in findings if f['type'] == 'multi'), findings[0])
+
+# [🔥 신규 기능] 기존 타겟 URL이 유효한지 검증하는 함수
+async def verify_urls_accessibility(context, target_data):
+    if not target_data: return False
+    urls_to_check = set([item['url'] for item in target_data if item.get('url')])
+    if not urls_to_check: return False
+
+    page = await context.new_page()
+    try:
+        for url in urls_to_check:
+            try:
+                # 15초 안에 HTTP 200~399 응답이 오는지 확인
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                if not response or response.status >= 400:
+                    print(f"   ⚠️ 검증 실패 (HTTP {response.status if response else 'Timeout'}): {url}")
+                    return False
+            except Exception as e:
+                print(f"   ⚠️ 검증 실패 (접속 에러): {url}")
+                return False
+        return True # 모든 URL이 정상 작동함
+    finally:
+        await page.close()
+
+async def process_region_with_retries(target, existing_data_map, browser):
+    region_name = target['nm']
+    candidate_urls = target.get('urls', [])
+    
+    # 스텔스 모드 컨텍스트 생성 (재시도 시마다 깨끗한 환경)
+    context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36")
     
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash-lite',
-            contents=prompt,
-            config={'response_mime_type': 'application/json'}
-        )
-        idx = json.loads(response.text)['best_index']
-        return findings[idx]
-    except:
-        # 에러 시 멀티가 있으면 멀티 우선, 아니면 첫 번째
-        for f in findings:
-            if f['type'] == 'multi': return f
-        return findings[0] if findings else None
-
-async def process_region(region_data):
-    name = region_data['nm']
-    candidate_urls = region_data.get('urls', [])
-    
-    print(f"\n🚀 [{name}] 정밀 탐색 시작")
-    
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        findings = [] 
-        for url in candidate_urls:
-            print(f" 👉 진입: {url}")
-            result = await navigate_single_candidate(name, browser, url)
-            if result:
-                findings.append(result)
-        
-        await browser.close()
-        
-        if not findings:
-            return {"nm": name, "board_data": None, "status": "failed"}
-        
-        # 토너먼트 진행
-        if len(findings) > 1:
-            winner = await select_the_best_one(name, findings)
-        else:
-            winner = findings[0]
+        # 1. 기존 데이터 유효성 검증 (Pre-check)
+        existing_info = existing_data_map.get(region_name)
+        if existing_info and existing_info.get("status") == "success":
+            print(f" 🔍 기존 [{region_name}] 데이터 발견. URL 생존 여부를 검증합니다...")
+            is_valid = await verify_urls_accessibility(context, existing_info.get("target_data", []))
             
-        print(f" 🏆 최종 우승: {winner}")
-        
-        if winner['type'] == 'multi':
-            return {"nm": name, "type": "multi", "endpoints": winner['endpoints'], "status": "success"}
-        else:
-            return {"nm": name, "type": "single", "board_url": winner['url'], "status": "success"}
+            if is_valid:
+                print(f" 🟢 [검증 통과] 기존 URL이 유효합니다. 탐색을 건너뜁니다.")
+                return existing_info
+            else:
+                print(f" 🔴 [검증 실패] URL이 죽었거나 접속 불가합니다. 재탐색을 시작합니다.")
+
+        # 2. 신규 탐색 또는 재탐색 시작 (Retry Loop)
+        for attempt in range(MAX_RETRIES):
+            print(f"\n🚀 [{region_name}] 정밀 탐색 시작 (시도: {attempt + 1}/{MAX_RETRIES})")
+            findings = [] 
+            
+            for url in candidate_urls:
+                print(f" 👉 진입: {url}")
+                result = await navigate_single_candidate(region_name, context, url)
+                if result: findings.append(result)
+                
+            if findings:
+                winner = await select_the_best_one(region_name, findings) if len(findings) > 1 else findings[0]
+                print(f" 🏆 최종 우승 선정 완료")
+                return {
+                    "nm": region_name,
+                    "type": winner['type'],
+                    "target_data": winner.get('target_data', []),
+                    "status": "success"
+                }
+            else:
+                print(f" ⚠️ [{region_name}] 탐색 실패. 유효한 리스트를 찾지 못했습니다.")
+                if attempt < MAX_RETRIES - 1:
+                    print(" 🔄 처음부터 다시 시도합니다...")
+                    await asyncio.sleep(3)
+                    
+        return {"nm": region_name, "status": "failed"}
+    finally:
+        await context.close()
 
 async def main():
     if not os.path.exists(INPUT_FILE):
-        print("❌ discovered_urls.json 파일이 없습니다.")
+        print(f"❌ {INPUT_FILE} 파일이 없습니다.")
         return
 
-    with open(INPUT_FILE, "r", encoding="utf-8") as f:
-        targets = json.load(f)
+    targets = []
+    try:
+        with open(INPUT_FILE, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if content: targets = json.loads(content)
+    except:
+        print(f"💥 {INPUT_FILE} 로딩 오류.")
+        return
 
-    print(f"🔥 총 {len(targets)}개 지역에 대한 '지능형 탐색'을 시작합니다.")
-    print("---------------------------------------------------")
+    if not targets:
+        print("🚩 처리할 타겟이 없습니다.")
+        return
 
-    results = []
-    
-    for i, target in enumerate(targets):
-        region_name = target['nm']
-        print(f"\n[{i+1}/{len(targets)}] 🚩 {region_name} 처리 중")
-        
+    # [🔥 핵심] 기존에 저장된 target_boards.json 맵핑 데이터 불러오기
+    existing_data_map = {}
+    if os.path.exists(OUTPUT_FILE):
         try:
-            result = await process_region(target)
-            results.append(result)
-            
-            # 중간 저장 (Incremental Save)
-            with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-                json.dump(results, f, ensure_ascii=False, indent=2)
-            print(f"   💾 {region_name} 저장 완료")
+            with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    existing_list = json.loads(content)
+                    for item in existing_list:
+                        existing_data_map[item['nm']] = item
+        except: pass # 파싱 실패 시 무시하고 새로 생성
 
-        except Exception as e:
-            print(f"   💥 {region_name} 처리 중 치명적 오류: {e}")
+    print(f"🔥 총 {len(targets)}개 지역에 대한 '지능형 하이브리드 탐색'을 시작합니다.")
+    print("-" * 50)
+    
+    results = []
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
         
-        # 서버 부하 방지 휴식
-        print("   ☕ 잠시 숨 고르기 (3초)...")
-        await asyncio.sleep(3)
-
-    print("\n" + "="*50)
-    print(f"✨ 모든 사냥 종료! {OUTPUT_FILE} 확인 바람.")
-    print(f"✨ 총 발견된 지역: {len(results)}")
-    print("="*50)
+        for i, target in enumerate(targets):
+            region_name = target['nm']
+            print(f"\n[{i+1}/{len(targets)}] 🚩 {region_name} 처리 중")
+            try:
+                result = await process_region_with_retries(target, existing_data_map, browser)
+                results.append(result)
+                
+                # 중간 저장 (Incremental Save)
+                with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+                    json.dump(results, f, ensure_ascii=False, indent=2)
+                print(f"   💾 {region_name} 저장 완료")
+            except Exception as e: print(f"   💥 오류: {e}")
+            
+        await browser.close()
+    print(f"\n✨ 사냥 종료! {OUTPUT_FILE} 확인 바람.")
 
 if __name__ == "__main__":
     asyncio.run(main())
