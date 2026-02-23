@@ -1,28 +1,16 @@
 #!/usr/bin/env python3
 """
-청년 정책 스크래퍼 (최적화 버전)
+청년 정책 스크래퍼 (최적화 + 상세 데이터 정밀 추출 버전)
 =====================================
 입력 : data_engineering/scraper/target_boards.json
 출력 : data_engineering/scraper/scraped_policies.json
-
-지원 시나리오:
-  1. action=direct + 목록 URL  → 페이징 순회 → 각 정책 클릭 → 추출
-  2. action=click  + target_text → 탭 클릭 → 목록 순회 → 추출
-  3. action=direct + 단일 정책 URL → 페이지 자체에서 직접 추출
-
-비용·시간 최적화:
-  - 도메인별 CSS 셀렉터 캐싱 → 동일 사이트 = Gemini 1회 호출
-  - HTML 전처리 후 전송 → 토큰 최소화
-  - 실제 URL 있는 항목은 직접 이동 (JS 클릭보다 빠름)
-  - asyncio Semaphore → 지역 단위 병렬 처리
 """
 
 import json
 import os
 import asyncio
 import re
-from urllib.parse import urlparse, urlencode, urlparse, parse_qs, urlencode, urlunparse
-
+from urllib.parse import urlparse
 from playwright.async_api import async_playwright, Page, BrowserContext
 from google import genai
 
@@ -34,28 +22,31 @@ OUTPUT_FILE = os.path.join(BASE_DIR, "scraped_policies.json")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
-MAX_PAGES          = 50   # 페이지 최대 순회 수
-MAX_ITEMS_PER_PAGE = 50   # 페이지당 최대 항목 수
-REGION_CONCURRENCY = 2    # 동시 처리 지역 수 (높이면 차단 위험)
+MAX_PAGES          = 100   # 페이지 최대 순회 수
+MAX_ITEMS_PER_PAGE = 100   # 페이지당 최대 항목 수
+REGION_CONCURRENCY = 2    # 동시 처리 지역 수
 PAGE_WAIT          = 1.5  # 페이지 로드 후 대기(초)
 NAV_TIMEOUT        = 20_000  # 페이지 이동 타임아웃(ms)
 
 # ── 공통 JS 스니펫 ─────────────────────────────────────────────────────────────
-# 사이드바·노이즈 제거 후 HTML 7000자 추출
-# ※ 'aside'(태그)와 '.aside'(클래스) 모두 제거
+
 _TRIM_HTML_JS = """() => {
-    let c = document.body.cloneNode(true);
+    const mainSelectors = ['.detailview', '.board_view', '#content', 'main', '.content', '#main', '.skinContainer'];
+    let targetEl = document.body;
+    for (let sel of mainSelectors) {
+        const el = document.querySelector(sel);
+        if (el) { targetEl = el; break; }
+    }
+
+    let c = targetEl.cloneNode(true);
     c.querySelectorAll(
         'script,style,svg,img,nav,footer,header,aside,.aside,' +
         '.gnb,.lnb,.snb,.location,.breadcrumb,.sitemap,.skip,.skip-nav'
     ).forEach(e => e.remove());
-    return c.innerHTML.substring(0, 7000);
+    
+    return c.innerHTML.substring(0, 15000);
 }"""
 
-# 정책 목록 링크만 선별하는 JS
-# - 사이드바·헤더·푸터·검색필터 영역 제외
-# - 텍스트 패턴으로 네비게이션/버튼 링크 제외
-# - 8자 미만 텍스트는 메뉴로 간주
 _GET_LINKS_JS = """() => {
     const BAD = [
         '.aside', 'aside', '#aside', '.sidebar',
@@ -80,8 +71,8 @@ _GET_LINKS_JS = """() => {
         /로그인|회원가입/,
         /이용약관|개인정보처리방침/,
         /오시는길|찾아오시는/,
-        /^https?:\\/\\//,    // 텍스트가 URL 자체인 링크 제외
-        / > /,              // "A > B > C" 형식의 breadcrumb 텍스트 제외
+        /^https?:\\/\\//,    
+        / > /,              
     ];
     const IGNORE_EXACT = new Set([
         '신청하기','자세히보기','더보기','전체보기','목록','목록으로',
@@ -90,7 +81,6 @@ _GET_LINKS_JS = """() => {
         '신청','접수','확인','닫기',
     ]);
 
-    // 메인 컨텐츠 영역 (우선순위 순)
     const MAIN_CANDIDATES = [
         '#printId','#content','#main','#contents',
         '.con','.cont','.content','.contents',
@@ -123,8 +113,6 @@ _GET_LINKS_JS = """() => {
     return results;
 }"""
 
-# 카드 목록 방식 — '자세히보기'/'상세보기' 버튼 카드 정보 수집 JS
-# 버튼 개수 + 부모 카드의 제목 텍스트를 함께 반환
 _GET_DETAIL_BTN_INFO_JS = """() => {
     const BTN_TEXTS = ['자세히보기', '상세보기', '자세히 보기', '상세 보기'];
     const btns = Array.from(document.querySelectorAll('a')).filter(a => {
@@ -132,7 +120,6 @@ _GET_DETAIL_BTN_INFO_JS = """() => {
         return BTN_TEXTS.includes(t) && a.offsetWidth > 0 && a.offsetHeight > 0;
     });
     return btns.map(btn => {
-        // 부모 카드(li, article, .card, .item 등)에서 제목 추출
         const card = btn.closest('li, article, .card, .item, .list-item, tr, .policy-item')
                      || btn.parentElement?.parentElement
                      || btn.parentElement;
@@ -143,7 +130,6 @@ _GET_DETAIL_BTN_INFO_JS = """() => {
             );
             title = titleEl ? titleEl.innerText.trim() : '';
             if (!title) {
-                // fallback: 카드 내 가장 긴 텍스트 노드
                 const texts = Array.from(card.querySelectorAll('*'))
                     .map(el => (el.innerText || '').trim())
                     .filter(t => t.length >= 5 && t !== btn.innerText.trim());
@@ -154,7 +140,6 @@ _GET_DETAIL_BTN_INFO_JS = """() => {
     });
 }"""
 
-# ── 사이드바 필터 단어 (Python 측 추가 보호) ──────────────────────────────────
 _IGNORE_TEXTS = frozenset([
     "로그인","회원가입","개인정보","이용약관","오시는길","중앙정부","타지역",
     "캘린더","더보기","전체보기","목록으로","이전","다음","처음","끝",
@@ -171,10 +156,6 @@ _css_lock  = asyncio.Lock()
 # [LLM] CSS 셀렉터 추출 (도메인별 1회)
 # ──────────────────────────────────────────────────────────────────────────────
 async def get_css_rules(page: Page, domain: str) -> dict | None:
-    """
-    도메인별로 CSS 셀렉터를 캐싱한다.
-    같은 도메인(chungbuk.go.kr 등)은 첫 번째 상세 페이지 방문 시 1회만 Gemini 호출.
-    """
     async with _css_lock:
         if domain in _css_cache:
             return _css_cache[domain]
@@ -182,20 +163,28 @@ async def get_css_rules(page: Page, domain: str) -> dict | None:
     print(f"   🧠 [LLM] {domain} CSS 셀렉터 추출 (최초 1회)")
     html = await page.evaluate(_TRIM_HTML_JS)
 
+    # [🔥 핵심 수술 1] 프롬프트 개조: AI가 범용적으로 정확한 의미를 파악하여 CSS를 짜도록 지시
     prompt = f"""아래는 청년 정책 **상세 페이지** HTML이야.
-다음 5개 항목을 각각 추출할 수 있는 Playwright CSS Selector를 JSON으로 줘.
-항목이 없으면 빈 문자열("")로 줘. 셀렉터는 반드시 실제 DOM에 존재하는 것만 사용해.
+다음 6개 항목을 각각 추출할 수 있는 Playwright CSS Selector를 JSON으로 줘.
+
+[🔥 중요 작성 가이드 - 전국 지자체 공통 적용]
+1. target_sel(신청자격): 연령 한 줄만 가져오지 마라! '거주지', '소득', '학력' 등 전체 신청자격 내용이 모두 포함된 부모 태그(tbody, ul, div 전체)를 지정해라!
+2. period_sel(신청기간): 반드시 '사업 신청 기간' 또는 '모집 기간'을 가져와라. '사업 운영 기간'을 지정하면 절대 안된다!
+3. method_sel(신청방법): 표 안에 '신청 사이트(URL)'가 있다면 그 영역을 최우선으로 포함하고, 없으면 '신청 절차'가 담긴 영역을 지정해라.
+4. category_sel(정책분야): 페이지 내에 '정책분야', '분야' (예: 복지·문화, 일자리 등)가 명시되어 있다면 그 텍스트를 추출할 셀렉터를 지정해라.
+5. 표(Table/Div) 형태 데이터는 무조건 `:has()`와 `:has-text()`를 조합해서 정확히 타겟팅해라! (예: `tr:has(th:has-text('신청기간')) td`)
 
 HTML:
 {html}
 
 응답 JSON:
 {{
-  "title_sel":   "정책 제목 CSS 셀렉터",
-  "content_sel": "지원 내용 CSS 셀렉터",
-  "target_sel":  "지원 대상 CSS 셀렉터",
-  "period_sel":  "신청 기간 CSS 셀렉터",
-  "method_sel":  "신청 방법 CSS 셀렉터"
+  "category_sel": "정책분야 CSS 셀렉터 (화면에 명시되어 있을 경우 지정, 없으면 빈 문자열)",
+  "title_sel": "정책 제목 CSS 셀렉터",
+  "content_sel": "지원 내용 및 지원 금액 CSS 셀렉터 (금액 정보가 포함된 영역 지정)",
+  "target_sel": "지원 대상 및 신청 자격 '전체' 정보가 포함된 부모 CSS 셀렉터",
+  "period_sel": "'사업 신청 기간' CSS 셀렉터 (운영 기간 X)",
+  "method_sel": "신청 사이트 또는 신청 방법/절차 CSS 셀렉터"
 }}
 """
     rules: dict | None = None
@@ -206,7 +195,6 @@ HTML:
             config={"response_mime_type": "application/json"},
         )
         rules = json.loads(res.text)
-        # 빈 셀렉터 키는 제거
         rules = {k: v for k, v in rules.items() if v}
         print(f"   🎯 [셀렉터 획득] {rules}")
     except Exception as e:
@@ -218,25 +206,31 @@ HTML:
     return rules
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# [LLM] 폴백 — 전체 내용 직접 파싱 (CSS 규칙 없을 때)
-# ──────────────────────────────────────────────────────────────────────────────
 async def extract_with_llm(page: Page, source_url: str) -> dict:
     print(f"   🧠 [LLM 폴백] 전체 내용 직접 파싱")
     html = await page.evaluate(_TRIM_HTML_JS)
+    
+    # [🔥 핵심 수술 2] 폴백 LLM도 똑같은 기준을 적용받도록 강제
     prompt = f"""아래는 청년 정책 상세 페이지 HTML이야.
-다음 5개 항목을 추출해서 JSON으로 줘. 항목이 없으면 빈 문자열로 줘.
+다음 항목을 추출해서 JSON으로 줘. 항목이 없으면 빈 문자열로 줘.
+
+[🔥 중요 지침]
+- target: 연령뿐만 아니라 거주지, 소득요건, 우대사항 등 신청자격 '전체' 내용을 요약해.
+- period: '사업 운영 기간'이 아닌 '사업 신청 기간'을 정확히 추출해!
+- method: 신청 사이트 주소가 있으면 반드시 포함하고, 신청 절차도 적어줘.
+- category: 페이지 내에 명시된 정책분야(예: 일자리, 주거, 복지·문화 등)를 추출해. 없으면 비워둬.
 
 HTML:
 {html}
 
 응답 JSON:
 {{
-  "title":   "정책 제목",
-  "content": "지원 내용",
-  "target":  "지원 대상",
-  "period":  "신청 기간",
-  "method":  "신청 방법"
+  "category": "정책분야",
+  "title": "정책 제목",
+  "content": "지원 내용 및 지원 금액",
+  "target": "지원 대상 및 신청 자격 상세 전체",
+  "period": "사업 신청 기간",
+  "method": "신청 사이트 및 신청 방법"
 }}
 """
     try:
@@ -253,10 +247,9 @@ HTML:
         return {"source_url": source_url}
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# CSS 셀렉터로 데이터 추출
-# ──────────────────────────────────────────────────────────────────────────────
+# [🔥 핵심 수술 3] 카테고리 셀렉터 필드 맵핑 추가
 _FIELD_MAP = {
+    "category_sel": "category",
     "title_sel":   "title",
     "content_sel": "content",
     "target_sel":  "target",
@@ -273,34 +266,25 @@ async def extract_with_css(page: Page, rules: dict, source_url: str) -> dict:
             continue
         try:
             text = await page.locator(sel).first.inner_text(timeout=2_000)
-            data[field] = text.strip()
+            clean_text = re.sub(r'\s+', ' ', text).strip()
+            data[field] = clean_text
         except:
             data[field] = ""
     return data
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 정책 항목 링크 수집
-# ──────────────────────────────────────────────────────────────────────────────
 async def get_policy_links(page: Page) -> list[dict]:
-    """사이드바·노이즈를 제외하고, 정책 항목으로 보이는 링크만 반환.
-    대부분의 필터링은 JS(_GET_LINKS_JS) 내부에서 처리. Python 측은 추가 보호용."""
     raw: list[dict] = await page.evaluate(_GET_LINKS_JS)
     result = []
     for lk in raw:
         text = lk["text"]
-        # Python 측 추가 필터 (JS에서 못 잡은 케이스 대비)
         if any(bad in text for bad in _IGNORE_TEXTS):
             continue
         result.append(lk)
     return result[:MAX_ITEMS_PER_PAGE]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# '자세히보기' 버튼 수 카운트 (카드 목록 방식 감지용)
-# ──────────────────────────────────────────────────────────────────────────────
 async def count_detail_buttons(page: Page) -> int:
-    """페이지에 표시된 '자세히보기'/'상세보기' 버튼의 수를 반환."""
     return await page.evaluate("""() => {
         const BTN_TEXTS = ['자세히보기', '상세보기', '자세히 보기', '상세 보기'];
         return Array.from(document.querySelectorAll('a')).filter(a => {
@@ -310,14 +294,7 @@ async def count_detail_buttons(page: Page) -> int:
     }""")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 페이지 유형 판별 (목록 vs 상세)
-# ──────────────────────────────────────────────────────────────────────────────
 async def is_detail_page(page: Page) -> bool:
-    """
-    페이지가 단일 정책 상세 페이지인지 판단.
-    - 정책 링크가 2개 미만이거나 페이징이 없으면 상세 페이지로 간주.
-    """
     links = await get_policy_links(page)
     has_paging: bool = await page.evaluate(
         "() => !!document.querySelector('.paging, .pagination, [class*=\"pag\"]')"
@@ -325,11 +302,7 @@ async def is_detail_page(page: Page) -> bool:
     return len(links) < 3 or not has_paging
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 탭 클릭 (action=click)
-# ──────────────────────────────────────────────────────────────────────────────
 async def click_tab(page: Page, target_text: str) -> bool:
-    """target_text에 해당하는 탭/버튼을 클릭. 성공 시 True."""
     clean = re.sub(r"\(\d+.*?\)", "", target_text).strip()
     candidates = await page.locator(
         f"a:has-text('{clean}'), button:has-text('{clean}'), li:has-text('{clean}')"
@@ -337,7 +310,6 @@ async def click_tab(page: Page, target_text: str) -> bool:
     for el in candidates:
         if not await el.is_visible():
             continue
-        # breadcrumb·헤더는 제외
         is_nav = await el.evaluate(
             "el => !!el.closest('.location, .breadcrumb, h1, h2, h3, header')"
         )
@@ -354,11 +326,7 @@ async def click_tab(page: Page, target_text: str) -> bool:
     return False
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 페이지 번호 이동
-# ──────────────────────────────────────────────────────────────────────────────
 async def go_to_page_num(page: Page, page_num: int) -> bool:
-    """페이징 UI에서 page_num 번째 페이지로 이동. 성공 시 True."""
     if page_num <= 1:
         return True
     try:
@@ -374,37 +342,41 @@ async def go_to_page_num(page: Page, page_num: int) -> bool:
         return False
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 상세 페이지 데이터 추출 (단건)
-# ──────────────────────────────────────────────────────────────────────────────
 async def extract_policy(
     page: Page,
     source_url: str,
     region: str,
-    category: str,
+    json_category: str,
     fallback_title: str = "",
     css_rules: dict | None = None,
 ) -> dict:
     domain = urlparse(source_url).netloc
 
-    # CSS 규칙이 없으면 도메인 캐시 조회 or LLM 호출
     if css_rules is None:
         css_rules = await get_css_rules(page, domain)
 
     if css_rules:
         data = await extract_with_css(page, css_rules, source_url)
+        empty_count = sum(1 for v in [data.get('target'), data.get('period'), data.get('method')] if not v)
+        if empty_count >= 2:
+            print(f"   ⚠️ CSS 추출 결과 부실. LLM 딥다이브 파싱으로 전환합니다.")
+            data = await extract_with_llm(page, source_url)
     else:
         data = await extract_with_llm(page, source_url)
 
     if not data.get("title") and fallback_title:
         data["title"] = fallback_title
-    data.update({"region": region, "category": category})
+        
+    # [🔥 핵심 수술 4] 웹페이지에서 직접 뽑은 카테고리(정책분야)가 있으면 최우선 적용!
+    # 없다면 target_boards.json에서 넘겨준 카테고리(json_category)를 폴백으로 사용
+    extracted_cat = data.get("category", "").strip()
+    if not extracted_cat or "추출 불가" in extracted_cat:
+        data["category"] = json_category 
+        
+    data["region"] = region
     return data
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 목록 페이지 순회 스크래핑
-# ──────────────────────────────────────────────────────────────────────────────
 async def scrape_list(
     page: Page,
     base_url: str,
@@ -413,22 +385,12 @@ async def scrape_list(
     region: str,
     category: str,
 ) -> list[dict]:
-    """
-    목록 페이지를 페이징 순회하며 각 정책 상세 페이지 내용을 수집.
-
-    최적화 전략:
-      - 실제 URL(href)이 있는 항목 → 목록 재로드 없이 직접 이동 (빠름)
-      - JS 링크(#none, javascript:) 항목 → 목록 복구 후 클릭
-      - 도메인별 CSS 규칙을 첫 번째 상세 페이지에서만 LLM으로 추출하고 재사용
-    """
     policies: list[dict] = []
     domain = urlparse(base_url).netloc
     css_rules: dict | None = None
-    # 탭 클릭 이후 실제 목록 URL (AJAX 이후 바뀐 URL 캐싱)
     list_url_cache: str | None = None
 
     async def restore_list(pnum: int) -> None:
-        """목록 상태 복구 + 페이지 이동."""
         nonlocal list_url_cache
         if list_url_cache and pnum == 1:
             await page.goto(list_url_cache, wait_until="domcontentloaded", timeout=NAV_TIMEOUT)
@@ -438,7 +400,7 @@ async def scrape_list(
             if action == "click" and target_text:
                 if await click_tab(page, target_text):
                     await asyncio.sleep(PAGE_WAIT)
-                    list_url_cache = page.url  # 탭 클릭 후 URL 캐싱
+                    list_url_cache = page.url
         if pnum > 1:
             await go_to_page_num(page, pnum)
 
@@ -453,12 +415,6 @@ async def scrape_list(
 
         print(f"   🔍 {len(links)}개 항목 발견")
 
-        # 항목 방문 전략 결정
-        # JS 링크가 하나라도 있으면 클릭 방식 사용 (목록 복구 필요)
-        # - href="#none"  : 서울시 등 onclick 기반
-        # - href="#"      : 강원도 등 AJAX 패널 기반  ← 이전에 누락
-        # - href=""       : 빈 href (JS 이벤트만 사용)
-        # - javascript:   : 명시적 JS 링크
         _JS_HREF = frozenset({"#", "#none", "", "javascript:void(0)", "javascript:;"})
         has_js = any(
             lk["raw_href"].strip().lower() in _JS_HREF
@@ -474,31 +430,23 @@ async def scrape_list(
 
             try:
                 if not has_js and href and "javascript" not in raw:
-                    # ── 직접 URL 이동 (빠름) ──
                     await page.goto(href, wait_until="domcontentloaded", timeout=NAV_TIMEOUT)
                     await asyncio.sleep(1)
                 else:
-                    # ── 목록 복구 후 클릭 (JS 기반 사이트) ──
                     await restore_list(page_num)
                     before_url  = page.url
-                    before_text = await page.evaluate(
-                        "() => document.body.innerText.slice(0, 300)"
-                    )
+                    before_text = await page.evaluate("() => document.body.innerText.slice(0, 300)")
                     item_el = page.locator(f"a:has-text('{text}')").filter(visible=True).first
                     await item_el.click(timeout=5_000)
-                    await asyncio.sleep(2.5)  # AJAX 로딩 대기
+                    await asyncio.sleep(2.5)
                     after_url  = page.url
-                    after_text = await page.evaluate(
-                        "() => document.body.innerText.slice(0, 300)"
-                    )
-                    # URL도 안 바뀌고 컨텐츠도 안 바뀌면 → 실제 이동 없음, 스킵
+                    after_text = await page.evaluate("() => document.body.innerText.slice(0, 300)")
                     if after_url == before_url and after_text == before_text:
                         print(f"      ⏭️  URL/컨텐츠 미변경 — 스킵")
                         continue
 
                 detail_url = page.url
 
-                # CSS 규칙 초기화 (도메인별 최초 1회 LLM 호출)
                 if css_rules is None:
                     css_rules = await get_css_rules(page, domain)
 
@@ -507,10 +455,7 @@ async def scrape_list(
                     fallback_title=text, css_rules=css_rules
                 )
 
-                # 데이터 유효성 검사 — 제목·내용이 모두 없으면 노이즈 페이지
                 if not data.get("title") and not data.get("content"):
-                    # CSS 규칙이 잘못된 페이지(목록 페이지 등)에서 추출된 것일 수 있음
-                    # → 도메인 캐시를 무효화하여 다음 항목에서 재시도
                     async with _css_lock:
                         _css_cache.pop(domain, None)
                     css_rules = None
@@ -523,8 +468,6 @@ async def scrape_list(
             except Exception as e:
                 print(f"      ⚠️  실패: {text[:20]} — {e}")
 
-        # 다음 페이지 존재 확인 (현재 목록 기준)
-        # go_to_page_num이 False 를 반환하면 마지막 페이지
         await restore_list(page_num)
         if not await go_to_page_num(page, page_num + 1):
             print(f"   ✅ 마지막 페이지 ({page_num})")
@@ -533,9 +476,6 @@ async def scrape_list(
     return policies
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# '자세히보기' 버튼 기반 카드 목록 스크래핑 (URL 미변경 AJAX 방식)
-# ──────────────────────────────────────────────────────────────────────────────
 async def scrape_via_detail_buttons(
     page: Page,
     base_url: str,
@@ -544,10 +484,6 @@ async def scrape_via_detail_buttons(
     region: str,
     category: str,
 ) -> list[dict]:
-    """
-    '자세히보기'/'상세보기' 버튼이 있는 카드 목록 처리 (예: 강원도).
-    URL이 변경되지 않는 AJAX 패널 방식 대응 — 인덱스 기반(.nth(i))으로 클릭.
-    """
     policies: list[dict] = []
     domain = urlparse(base_url).netloc
     css_rules: dict | None = None
@@ -571,7 +507,6 @@ async def scrape_via_detail_buttons(
         print(f"\n   📄 [페이지 {page_num}] 카드 목록 로드 (자세히보기 방식)...")
         await restore_list(page_num)
 
-        # 현재 페이지의 카드 정보 수집 (제목 + 버튼 수)
         btn_infos: list[dict] = await page.evaluate(_GET_DETAIL_BTN_INFO_JS)
         count = len(btn_infos)
         if count == 0:
@@ -585,11 +520,8 @@ async def scrape_via_detail_buttons(
             print(f"      [{i+1}/{count}] {fallback_title[:25] or '(제목 미확인)'}...")
 
             try:
-                # 목록 상태 복구 후 i번째 버튼 클릭 (인덱스 기반)
                 await restore_list(page_num)
-                before_text = await page.evaluate(
-                    "() => document.body.innerText.slice(0, 500)"
-                )
+                before_text = await page.evaluate("() => document.body.innerText.slice(0, 500)")
 
                 btn_locator = page.locator(
                     "a:has-text('자세히보기'), a:has-text('상세보기'), "
@@ -599,14 +531,12 @@ async def scrape_via_detail_buttons(
                 await btn_locator.click(timeout=5_000)
                 await asyncio.sleep(2.5)
 
-                after_text = await page.evaluate(
-                    "() => document.body.innerText.slice(0, 500)"
-                )
+                after_text = await page.evaluate("() => document.body.innerText.slice(0, 500)")
                 if after_text == before_text:
                     print(f"      ⏭️  컨텐츠 미변경 — 스킵")
                     continue
 
-                detail_url = page.url  # URL이 안 바뀌어도 source_url로 기록
+                detail_url = page.url
 
                 if css_rules is None:
                     css_rules = await get_css_rules(page, domain)
@@ -630,7 +560,6 @@ async def scrape_via_detail_buttons(
             except Exception as e:
                 print(f"      ⚠️  실패: {fallback_title[:20]} — {e}")
 
-        # 다음 페이지 존재 확인 (URL 미변경 사이트도 내용은 바뀜)
         await restore_list(page_num)
         before_page = await page.evaluate("() => document.body.innerText.slice(0, 300)")
         moved = await go_to_page_num(page, page_num + 1)
@@ -645,18 +574,11 @@ async def scrape_via_detail_buttons(
     return policies
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# target_info 단건 처리 (시나리오 분기)
-# ──────────────────────────────────────────────────────────────────────────────
 async def scrape_target(
     context: BrowserContext,
     region: str,
     target_info: dict,
 ) -> list[dict]:
-    """
-    target_boards.json의 target_data 항목 1개를 처리.
-    시나리오 1·2·3 자동 분기.
-    """
     page = await context.new_page()
     base_url    = target_info["url"]
     action      = target_info["action"]
@@ -668,31 +590,22 @@ async def scrape_target(
         await page.goto(base_url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT)
         await asyncio.sleep(PAGE_WAIT)
 
-        # 탭 클릭 (action=click)
         if action == "click" and target_text:
             await click_tab(page, target_text)
             await asyncio.sleep(PAGE_WAIT)
 
-        # ── 페이지 유형 자동 판별 ──
-        # 1순위: '자세히보기'/'상세보기' 버튼이 2개 이상 → 카드 목록 방식
         detail_btn_count = await count_detail_buttons(page)
         if detail_btn_count >= 2:
             print(f"   🃏 [카드 목록 — 자세히보기 방식] {base_url} ({detail_btn_count}개 버튼)")
-            policies = await scrape_via_detail_buttons(
-                page, base_url, action, target_text, region, category
-            )
+            policies = await scrape_via_detail_buttons(page, base_url, action, target_text, region, category)
         elif await is_detail_page(page):
-            # 시나리오 3: URL 자체가 단일 정책 페이지
             print(f"   📌 [직접 추출] {base_url}")
             data = await extract_policy(page, page.url, region, category)
             if data:
                 policies.append(data)
         else:
-            # 시나리오 1·2: 목록 페이지 순회
             print(f"   📋 [목록 순회] {base_url}")
-            policies = await scrape_list(
-                page, base_url, action, target_text, region, category
-            )
+            policies = await scrape_list(page, base_url, action, target_text, region, category)
 
     except Exception as e:
         print(f"   ❌ [{region}/{category}] 오류: {e}")
@@ -702,9 +615,6 @@ async def scrape_target(
     return policies
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 지역 단위 처리
-# ──────────────────────────────────────────────────────────────────────────────
 async def scrape_region(browser, region_entry: dict) -> dict:
     region_name = region_entry["nm"]
     region_policies: list[dict] = []
@@ -735,9 +645,6 @@ async def scrape_region(browser, region_entry: dict) -> dict:
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 메인
-# ──────────────────────────────────────────────────────────────────────────────
 async def main() -> None:
     if not os.path.exists(INPUT_FILE):
         print(f"❌ {INPUT_FILE} 파일이 없습니다.")
@@ -746,14 +653,12 @@ async def main() -> None:
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         targets: list[dict] = json.loads(f.read())
 
-    # status=success 인 지역만 처리
     active = [t for t in targets if t.get("status") == "success"]
     print(f"🔥 총 {len(active)}개 지역 스크래핑 시작 (동시 처리: {REGION_CONCURRENCY})")
     print("-" * 60)
 
     all_data: list[dict] = []
     save_lock = asyncio.Lock()
-
     semaphore = asyncio.Semaphore(REGION_CONCURRENCY)
 
     async def process_with_sem(browser, entry: dict) -> None:
