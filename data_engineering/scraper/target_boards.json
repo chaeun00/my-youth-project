@@ -5,15 +5,15 @@
     "target_data": [
       {
         "category": "서울시 정책",
-        "url": "https://youth.seoul.go.kr/infoData/plcyInfo/list.do?key=2309150002",
-        "action": "click",
-        "target_text": "서울시 정책(335건)"
+        "url": "https://youth.seoul.go.kr/infoData/plcyInfo/ctList.do?sprtInfoId=&plcyBizId=&key=2309150002&sc_detailAt=&pageIndex=1&orderBy=regYmd+desc&blueWorksYn=N&tabKind=002&sw=",
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "자치구 정책",
-        "url": "https://youth.seoul.go.kr/infoData/plcyInfo/list.do?key=2309150002",
-        "action": "click",
-        "target_text": "자치구 정책(335건)"
+        "url": "https://youth.seoul.go.kr/infoData/plcyInfo/guList.do?plcyBizId=&tab=001&key=2309150002&sc_detailAt=&pageIndex=1&orderBy=regYmd+desc&blueWorksYn=N&tabKind=003&sw=",
+        "action": "direct",
+        "target_text": null
       }
     ],
     "status": "success"
@@ -38,86 +38,86 @@
       {
         "category": "일자리",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939131",
-        "action": "click",
-        "target_text": "일자리"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "주거",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939132",
-        "action": "click",
-        "target_text": "주거"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "교육",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939133",
-        "action": "click",
-        "target_text": "교육"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "일자리",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939137",
-        "action": "click",
-        "target_text": "일자리"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "교육",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939138",
-        "action": "click",
-        "target_text": "교육"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "복지문화",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939139",
-        "action": "click",
-        "target_text": "복지문화"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "일자리",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939140",
-        "action": "click",
-        "target_text": "일자리"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "주거",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939141",
-        "action": "click",
-        "target_text": "주거"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "교육",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940010",
-        "action": "click",
-        "target_text": "교육"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "복지문화",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939142",
-        "action": "click",
-        "target_text": "복지문화"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "주거",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940011",
-        "action": "click",
-        "target_text": "주거"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "교육",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940012",
-        "action": "click",
-        "target_text": "교육"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "복지문화",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00940013",
-        "action": "click",
-        "target_text": "복지문화"
+        "action": "direct",
+        "target_text": null
       },
       {
         "category": "참여권리",
         "url": "https://www.daegu.go.kr/YouthPolicy/index.do?menu_id=00939143",
-        "action": "click",
-        "target_text": "참여권리"
+        "action": "direct",
+        "target_text": null
       }
     ],
     "status": "success"
